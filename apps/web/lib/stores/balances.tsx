@@ -8,14 +8,17 @@ import { useCallback, useEffect, useState } from "react";
 import { useChainStore } from "./chain";
 import { useWalletStore } from "./wallet";
 import { useAppStore } from "./app";
+import { TOKENS } from "../constants";
+import { getTokenId } from "../utils";
+import { AppChainTokens } from "../types";
 
 export interface BalancesState {
   loading: boolean;
   balances: {
     // address - balance
-    [key: string]: string;
+    [key: string]: { [key in AppChainTokens]: string };
   };
-  loadBalance: (client: Client, address: string) => Promise<void>;
+  loadBalances: (client: Client, address: string) => Promise<void>;
   faucet: (client: Client, address: string) => Promise<PendingTransaction>;
   transfer: (
     client: Client,
@@ -36,24 +39,31 @@ export const useBalancesStore = create<
   BalancesState,
   [["zustand/immer", never]]
 >(
-  immer((set, get) => ({
+  immer((set) => ({
     loading: Boolean(false),
     balances: {},
-    async loadBalance(client: Client, address: string) {
+    async loadBalances(client: Client, address: string) {
       set((state) => {
         state.loading = true;
       });
 
-      const key = BalancesKey.from(
-        useAppStore.getState().activeTokenId,
-        PublicKey.fromBase58(address),
+      const balances = await Promise.all(
+        TOKENS.map((token) =>
+          client.query.runtime.Balances.balances.get(
+            BalancesKey.from(getTokenId(token), PublicKey.fromBase58(address)),
+          ),
+        ),
       );
-
-      const balance = await client.query.runtime.Balances.balances.get(key);
 
       set((state) => {
         state.loading = false;
-        state.balances[address] = balance?.toString() ?? "0";
+        state.balances[address] = balances.reduce(
+          (acc, value, index) => {
+            acc[TOKENS[index]] = value?.toString() ?? "0";
+            return acc;
+          },
+          {} as { [key in AppChainTokens]: string },
+        );
       });
     },
     async faucet(client: Client, address: string) {
@@ -101,16 +111,16 @@ export const useBalancesStore = create<
 );
 
 export const useObserveBalance = () => {
-  const client = useClientStore();
-  const chain = useChainStore();
-  const wallet = useWalletStore();
-  const balances = useBalancesStore();
+  const { client } = useClientStore();
+  const { block } = useChainStore();
+  const { wallet } = useWalletStore();
+  const { loadBalances } = useBalancesStore();
 
   useEffect(() => {
-    if (!client.client || !wallet.wallet) return;
+    if (!client || !wallet) return;
 
-    balances.loadBalance(client.client, wallet.wallet);
-  }, [client.client, chain.block?.height, wallet.wallet]);
+    loadBalances(client, wallet);
+  }, [client, block?.height, wallet]);
 };
 
 export const useFaucet = () => {

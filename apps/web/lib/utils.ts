@@ -15,11 +15,11 @@ export const getTokenId = (token: AppChainTokens): TokenId => {
       return TokenId.from(1);
     case "mETH":
       return TokenId.from(2);
-    case "mDEGEN":
+    case "mUSDT":
       return TokenId.from(3);
-    case "mPROTO":
+    case "mBNB":
       return TokenId.from(4);
-    case "mFLY":
+    case "mPTK":
       return TokenId.from(5);
   }
 };

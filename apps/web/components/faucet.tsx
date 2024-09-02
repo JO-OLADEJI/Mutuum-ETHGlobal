@@ -8,10 +8,6 @@ import { Separator } from "./ui/separator";
 import { useState } from "react";
 import { PublicKey } from "o1js";
 import { UInt64 } from "@proto-kit/library";
-import { useAppStore } from "@/lib/stores/app";
-import { getTokenId } from "@/lib/utils";
-import { AppChainTokens } from "@/lib/types";
-import { TOKENS } from "@/lib/constants";
 
 export interface FaucetProps {
   wallet?: string;
@@ -31,7 +27,6 @@ export function Faucet({
   trfLoading,
 }: FaucetProps) {
   const form = useForm();
-  const { activeTokenId, setActiveTokenId } = useAppStore();
   const [destAddr, setDestAddr] = useState<string>("");
   const [trfAmount, setTrfAmount] = useState<string>("");
 
@@ -108,25 +103,6 @@ export function Faucet({
         >
           Send
         </Button>
-
-        <Separator className="my-6" orientation={"horizontal"} />
-        <h2 className="mb-1 text-xl font-bold">Token (active)</h2>
-        <p className="mb-6 mt-1 text-sm text-zinc-500">
-          Select Token balance to display
-        </p>
-        {TOKENS.map((name, index) => (
-          <Button
-            key={index}
-            variant={
-              Number(activeTokenId.toBigInt().valueOf()) === index
-                ? "default"
-                : "outline"
-            }
-            onClick={() => setActiveTokenId(getTokenId(name))}
-          >
-            {name}
-          </Button>
-        ))}
       </div>
     </Card>
   );

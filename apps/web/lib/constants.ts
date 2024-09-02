@@ -2,9 +2,7 @@ export const TOKENS = [
   "mMINA",
   "mBTC",
   "mETH",
-  "mDEGEN",
-  "mPROTO",
-  "mFLY",
+  "mUSDT",
+  "mBNB",
+  "mPTK",
 ] as const;
-
-export const TOKEN_BTNS = [{ index: 0 }];

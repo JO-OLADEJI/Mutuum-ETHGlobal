@@ -7,38 +7,38 @@ import { useNotifyTransactions, useWalletStore } from "@/lib/stores/wallet";
 import { ReactNode, useEffect, useMemo } from "react";
 
 export default function AsyncLayout({ children }: { children: ReactNode }) {
-  const wallet = useWalletStore();
-  const client = useClientStore();
-  const chain = useChainStore();
-  const balances = useBalancesStore();
+  const walletStore = useWalletStore();
+  const clientStore = useClientStore();
+  const chainStore = useChainStore();
+  const balancesStore = useBalancesStore();
 
   usePollBlockHeight();
   useObserveBalance();
   useNotifyTransactions();
 
   useEffect(() => {
-    client.start();
+    clientStore.start();
   }, []);
 
   useEffect(() => {
-    wallet.initializeWallet();
-    wallet.observeWalletChange();
+    walletStore.initializeWallet();
+    walletStore.observeWalletChange();
   }, []);
 
   const loading = useMemo(
-    () => client.loading || balances.loading,
-    [client.loading, balances.loading],
+    () => clientStore.loading || balancesStore.loading,
+    [clientStore.loading, balancesStore.loading],
   );
 
   return (
     <>
       <Header
-        loading={client.loading}
-        balance={balances.balances[wallet.wallet ?? ""]}
+        loading={clientStore.loading}
+        balance={balancesStore.balances[walletStore.wallet ?? ""]?.["mMINA"]}
         balanceLoading={loading}
-        wallet={wallet.wallet}
-        onConnectWallet={wallet.connectWallet}
-        blockHeight={chain.block?.height ?? "-"}
+        wallet={walletStore.wallet}
+        onConnectWallet={walletStore.connectWallet}
+        blockHeight={chainStore.block?.height ?? "-"}
       />
       {children}
       <Toaster />

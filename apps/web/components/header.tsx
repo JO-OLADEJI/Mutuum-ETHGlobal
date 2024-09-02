@@ -6,6 +6,8 @@ import truncateMiddle from "truncate-middle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Chain } from "./chain";
 import { Separator } from "./ui/separator";
+import { TOKENS } from "@/lib/constants";
+import { useAppStore } from "@/lib/stores/app";
 
 export interface HeaderProps {
   loading: boolean;
@@ -24,6 +26,8 @@ export default function Header({
   balanceLoading,
   blockHeight,
 }: HeaderProps) {
+  const { activeTokenId } = useAppStore();
+
   return (
     <div className="flex items-center justify-between border-b p-2 shadow-sm">
       <div className="container flex">
@@ -41,12 +45,15 @@ export default function Header({
               <div>
                 <p className="text-xs">Your balance</p>
               </div>
-              <div className="w-32 pt-0.5 text-right">
-                {balanceLoading && balance === undefined ? (
-                  <Skeleton className="h-4 w-full" />
+              <div className="flex w-32 justify-end pt-0.5 text-right">
+                {balanceLoading && !balance ? (
+                  <Skeleton className="mr-1 h-4 w-10" />
                 ) : (
-                  <p className="text-xs font-bold">{balance} MINA</p>
-                )}
+                  <p className="mr-1 text-xs font-bold">{balance}</p>
+                )}{" "}
+                <p className="text-xs font-bold">
+                  {TOKENS[Number(activeTokenId.toBigInt().valueOf())]}
+                </p>
               </div>
             </div>
           )}

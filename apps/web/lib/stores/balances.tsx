@@ -2,11 +2,12 @@ import { create } from "zustand";
 import { Client, useClientStore } from "./client";
 import { immer } from "zustand/middleware/immer";
 import { PendingTransaction, UnsignedTransaction } from "@proto-kit/sequencer";
-import { Balance, BalancesKey, TokenId, UInt64 } from "@proto-kit/library";
+import { Balance, BalancesKey, UInt64 } from "@proto-kit/library";
 import { PublicKey } from "o1js";
 import { useCallback, useEffect, useState } from "react";
 import { useChainStore } from "./chain";
 import { useWalletStore } from "./wallet";
+import { useAppStore } from "./app";
 
 export interface BalancesState {
   loading: boolean;
@@ -31,13 +32,11 @@ function isPendingTransaction(
     throw new Error("Transaction is not a PendingTransaction");
 }
 
-export const tokenId = TokenId.from(0);
-
 export const useBalancesStore = create<
   BalancesState,
   [["zustand/immer", never]]
 >(
-  immer((set) => ({
+  immer((set, get) => ({
     loading: Boolean(false),
     balances: {},
     async loadBalance(client: Client, address: string) {
@@ -45,7 +44,10 @@ export const useBalancesStore = create<
         state.loading = true;
       });
 
-      const key = BalancesKey.from(tokenId, PublicKey.fromBase58(address));
+      const key = BalancesKey.from(
+        useAppStore.getState().activeTokenId,
+        PublicKey.fromBase58(address),
+      );
 
       const balance = await client.query.runtime.Balances.balances.get(key);
 
@@ -59,7 +61,11 @@ export const useBalancesStore = create<
       const sender = PublicKey.fromBase58(address);
 
       const tx = await client.transaction(sender, async () => {
-        await balances.addBalance(tokenId, sender, Balance.from(1000));
+        await balances.addBalance(
+          useAppStore.getState().activeTokenId,
+          sender,
+          Balance.from(1000),
+        );
       });
 
       await tx.sign();
@@ -78,7 +84,7 @@ export const useBalancesStore = create<
 
       const tx = await client.transaction(fromAddress, async () => {
         await balances.transferSigned(
-          tokenId,
+          useAppStore.getState().activeTokenId,
           fromAddress,
           toAddress,
           Balance.from(amount),

@@ -11,6 +11,8 @@ import { Card } from "../ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
 import { AppChainTokens } from "@/lib/types";
 import Image from "next/image";
+import { useState } from "react";
+import { Button } from "../ui/button";
 
 interface WalletProps {
   connectedAddress: string | undefined;
@@ -19,13 +21,25 @@ interface WalletProps {
 }
 
 const Wallet = ({ connectedAddress, balances, tokenPrices }: WalletProps) => {
+  const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(false);
+  const tokensWithBalance = TOKENS.filter((name) => balances?.[name] !== "0");
+
   return (
     <div className="w-full p-4">
-      <h2 className="mb-1 text-xl font-bold">Wallet</h2>
-      <p className="mb-6 mt-1 text-sm text-zinc-500">
-        Token Balance in AppChain
-      </p>
-      {TOKENS.map((name, index) => (
+      <div className="mb-6 mt-1 flex items-end justify-between">
+        <div>
+          <h2 className="mb-1 text-xl font-bold">Wallet</h2>
+          <p className="text-sm text-zinc-500">Token Balance in AppChain</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setHideZeroBalance((prev) => !prev)}
+        >
+          hide zero bal.
+        </Button>
+      </div>
+      {(hideZeroBalance ? tokensWithBalance : TOKENS).map((name, index) => (
         <Card
           key={index}
           className="mb-4 flex cursor-pointer items-center justify-between p-4"

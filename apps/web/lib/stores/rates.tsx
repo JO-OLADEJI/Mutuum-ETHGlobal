@@ -30,7 +30,7 @@ const useTokenPricesUSD = () => {
         {
           headers: {
             "Content-Type": "application/json",
-            "x-cg-demo-api-key": "CG-J14LEy7kbR5fa8esh5125aqj",
+            "x-cg-demo-api-key": process.env.NEXT_PUBLIC_COINGECKO_API_KEY,
           },
         },
       );

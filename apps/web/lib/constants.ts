@@ -9,7 +9,7 @@ export const TOKENS = [
   "mLINK",
 ] as const;
 
-// ethereum chain
+// ethereum mainnet
 export const TOKENS_PRICEFEED: { [key in AppChainTokens]: `0x${string}` } = {
   mMINA: "0x",
   mBTC: "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c",

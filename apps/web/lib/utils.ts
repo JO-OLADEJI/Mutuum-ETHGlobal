@@ -19,7 +19,7 @@ export const getTokenId = (token: AppChainTokens): TokenId => {
       return TokenId.from(3);
     case "mBNB":
       return TokenId.from(4);
-    case "mPTK":
+    case "mLINK":
       return TokenId.from(5);
   }
 };

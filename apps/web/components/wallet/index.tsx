@@ -1,5 +1,6 @@
 // functionalties
 // 1. View all tokens and dollar equivalent values
+// 2. create a script to get token prices from chainlink EVM addresses
 // 2. Btn to hide zero token balance
 // 3. send tokens to another address
 // 4. receive feature
@@ -14,9 +15,10 @@ import Image from "next/image";
 interface WalletProps {
   connectedAddress: string | undefined;
   balances: { [key in AppChainTokens]: string };
+  tokenPrices: Partial<{ [key in AppChainTokens]: string }>;
 }
 
-const Wallet = ({ connectedAddress, balances }: WalletProps) => {
+const Wallet = ({ connectedAddress, balances, tokenPrices }: WalletProps) => {
   return (
     <div className="w-full p-4">
       <h2 className="mb-1 text-xl font-bold">Wallet</h2>
@@ -37,7 +39,18 @@ const Wallet = ({ connectedAddress, balances }: WalletProps) => {
           </div>
           <div className="text-right text-sm">
             <p>{balances?.[name] ?? "0"}</p>
-            <p className="font-semibold">$92.51</p>
+            <p className="font-semibold">
+              {!balances?.[name]
+                ? "0"
+                : tokenPrices[name]
+                  ? (
+                      Number(balances[name]) * Number(tokenPrices[name])
+                    ).toLocaleString("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                    })
+                  : "-"}
+            </p>
           </div>
         </Card>
       ))}

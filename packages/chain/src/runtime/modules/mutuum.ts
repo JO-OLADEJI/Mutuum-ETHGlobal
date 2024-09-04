@@ -23,6 +23,10 @@ import { inject } from "tsyringe";
 // STEP 1: Write a Mina Smart contract and deploy it to an address - that's where the funds are transferred to for a Supply
 //
 
+interface MutuumConfig {
+  moderator: PublicKey;
+}
+
 export class PositionKey extends Struct({
   tokenId: TokenId,
   address: PublicKey,
@@ -33,8 +37,8 @@ export class PositionKey extends Struct({
 }
 
 @runtimeModule()
-export class Mutuum<Config = NoConfig> extends RuntimeModule<Config> {
-  @state() public CHAIN_VAULT_COMMITMENT = State.from<Field>(Field);
+export class Mutuum extends RuntimeModule<MutuumConfig> {
+  @state() public CHAIN_VAULT = State.from<PublicKey>(PublicKey);
   @state() public deposits = StateMap.from<PositionKey, UInt64>(
     PositionKey,
     UInt64,
@@ -45,31 +49,29 @@ export class Mutuum<Config = NoConfig> extends RuntimeModule<Config> {
   }
 
   @runtimeMethod()
-  public async setChainVaultCommitment(address: PublicKey) {
-    await this.CHAIN_VAULT_COMMITMENT.set(Poseidon.hash(address.toFields()));
+  public async setChainVault(address: PublicKey) {
+    assert(
+      this.transaction.sender.value.equals(this.config.moderator),
+      "Unauthorized!",
+    );
+    await this.CHAIN_VAULT.set(address);
   }
 
   // @runtimeMethod()
   // public async getPosition() {}
 
   @runtimeMethod()
-  public async supply(tokenId: TokenId, amount: UInt64, vault: PublicKey) {
-    // transfer money from the sender's balance to this smart contract
-    const commitment = await this.CHAIN_VAULT_COMMITMENT.get();
-
-    assert(
-      Poseidon.hash(vault.toFields()).equals(commitment.value),
-      "Invalid CHAIN_VAULT",
-    );
+  public async supply(tokenId: TokenId, amount: UInt64) {
+    const chainVaultAddr = await this.CHAIN_VAULT.get();
+    assert(chainVaultAddr.value.isEmpty().not(), "CHAIN_VAULT not set!");
 
     await this.balances.transferSigned(
       tokenId,
       this.transaction.sender.value,
-      vault,
+      chainVaultAddr.value,
       amount,
     );
 
-    // keep track of it
     await this.deposits.set(
       PositionKey.from(tokenId, this.transaction.sender.value),
       amount,

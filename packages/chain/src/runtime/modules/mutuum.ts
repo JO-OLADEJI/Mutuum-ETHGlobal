@@ -7,7 +7,7 @@ import {
 import { State, assert, StateMap } from "@proto-kit/protocol";
 import { NoConfig } from "@proto-kit/common";
 import { Balance, TokenId, UInt64 } from "@proto-kit/library";
-import { PublicKey, Field, Bool, Struct, Poseidon } from "o1js";
+import { PublicKey, Field, Bool, Struct, Poseidon, Provable } from "o1js";
 import { Balances } from "./balances";
 import { inject } from "tsyringe";
 
@@ -58,28 +58,48 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
   }
 
   // @runtimeMethod()
-  // public async getPosition() {}
+  // public async getHealthFactor() {}
+
+  // @runtimeMethod()
+  // public async attemptLiquidate(target: PublicKey) {}
 
   @runtimeMethod()
   public async supply(tokenId: TokenId, amount: UInt64) {
+    const positionId = PositionKey.from(tokenId, this.transaction.sender.value);
     const chainVaultAddr = await this.CHAIN_VAULT.get();
     assert(chainVaultAddr.value.isEmpty().not(), "CHAIN_VAULT not set!");
 
-    await this.balances.transferSigned(
+    await this.deposits.set(positionId, amount);
+    await this.balances.transfer(
       tokenId,
       this.transaction.sender.value,
       chainVaultAddr.value,
       amount,
     );
+  }
 
-    await this.deposits.set(
-      PositionKey.from(tokenId, this.transaction.sender.value),
+  @runtimeMethod()
+  public async withdraw(tokenId: TokenId, amount: UInt64) {
+    const positionId = PositionKey.from(tokenId, this.transaction.sender.value);
+    const chainVaultAddr = await this.CHAIN_VAULT.get();
+    const currentPosition = await this.deposits.get(positionId);
+
+    assert(currentPosition.value.greaterThan(UInt64.from(0)), "Null position!");
+    assert(
+      currentPosition.value.greaterThanOrEqual(amount),
+      "Position value exceeded!",
+    );
+
+    // TODO: check for health factor before withdrawal
+
+    await this.deposits.set(positionId, currentPosition.value.sub(amount));
+    await this.balances.transfer(
+      tokenId,
+      chainVaultAddr.value,
+      this.transaction.sender.value,
       amount,
     );
   }
-
-  // @runtimeMethod()
-  // public async withdraw() {}
 
   // @runtimeMethod()
   // public async borrow() {}

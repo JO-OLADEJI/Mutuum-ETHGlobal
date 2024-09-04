@@ -50,6 +50,29 @@ describe("Mutuum", () => {
     );
   };
 
+  const getPosition = async (target: PublicKey | PrivateKey, id?: TokenId) => {
+    return await appChain.query.runtime.Mutuum.deposits.get(
+      PositionKey.from(
+        id ?? tokenId,
+        target instanceof PublicKey ? target : target.toPublicKey(),
+      ),
+    );
+  };
+
+  const drip = async (signer: PrivateKey, amount?: UInt64) => {
+    appChain.setSigner(signer);
+    const tx = await appChain.transaction(signer.toPublicKey(), async () => {
+      await mutuum.balances.addBalance(
+        tokenId,
+        signer.toPublicKey(),
+        amount ?? UInt64.from(100),
+      );
+    });
+    await tx.sign();
+    await tx.send();
+    await appChain.produceBlock();
+  };
+
   const setChainValut = async (signer?: PrivateKey) => {
     appChain.setSigner(signer ?? MODERATOR);
     const tx = await appChain.transaction(
@@ -63,14 +86,20 @@ describe("Mutuum", () => {
     await appChain.produceBlock();
   };
 
-  const drip = async (signer: PrivateKey, amount?: UInt64) => {
+  const supplyLiquidity = async (signer: PrivateKey, amount: UInt64) => {
     appChain.setSigner(signer);
     const tx = await appChain.transaction(signer.toPublicKey(), async () => {
-      await mutuum.balances.addBalance(
-        tokenId,
-        signer.toPublicKey(),
-        amount ?? UInt64.from(100),
-      );
+      await mutuum.supply(tokenId, amount);
+    });
+    await tx.sign();
+    await tx.send();
+    await appChain.produceBlock();
+  };
+
+  const withdrawLiquidity = async (signer: PrivateKey, amount: UInt64) => {
+    appChain.setSigner(signer);
+    const tx = await appChain.transaction(signer.toPublicKey(), async () => {
+      await mutuum.withdraw(tokenId, amount);
     });
     await tx.sign();
     await tx.send();
@@ -111,17 +140,7 @@ describe("Mutuum", () => {
   });
 
   describe("supply", () => {
-    const supplyLiquidity = async (signer: PrivateKey, amount: UInt64) => {
-      appChain.setSigner(signer);
-      const tx = await appChain.transaction(signer.toPublicKey(), async () => {
-        await mutuum.supply(tokenId, amount);
-      });
-      await tx.sign();
-      await tx.send();
-      await appChain.produceBlock();
-    };
-
-    it("should record no changes if CHAIN_VAULT is not set", async () => {
+    it("should fail if CHAIN_VAULT is not set", async () => {
       const ADAM_SMITH = PrivateKey.random();
       await drip(ADAM_SMITH);
 
@@ -139,7 +158,7 @@ describe("Mutuum", () => {
       );
     });
 
-    it("should transfer balance to CHAIN_VAULT and keep track of it", async () => {
+    it("should transfer balance to CHAIN_VAULT and update position", async () => {
       const ADAM_SMITH = PrivateKey.random();
       await drip(ADAM_SMITH);
       await setChainValut(MODERATOR);
@@ -160,9 +179,7 @@ describe("Mutuum", () => {
         (await getBalance(ADAM_SMITH))?.toBigInt() ?? BigInt(0);
       const chainVaultFinalBalance =
         (await getBalance(CHAIN_VAULT))?.toBigInt() ?? BigInt(0);
-      const supplyPosition = await appChain.query.runtime.Mutuum.deposits.get(
-        PositionKey.from(tokenId, ADAM_SMITH.toPublicKey()),
-      );
+      const supplyPosition = await getPosition(ADAM_SMITH);
 
       const adamSmithBalanceDelta =
         adamSmithFinalBalance - adamSmithInitBalance;
@@ -171,6 +188,88 @@ describe("Mutuum", () => {
 
       expect(adamSmithBalanceDelta * -1n).toEqual(chainVaultBalanceDelta);
       expect(chainVaultBalanceDelta).toBe(supplyPosition?.toBigInt());
+    });
+  });
+
+  describe("withdraw", () => {
+    const initialAirdrop = UInt64.from(100);
+
+    const initConditions = async (signer: PrivateKey) => {
+      await drip(signer, initialAirdrop);
+      await setChainValut(MODERATOR);
+      await supplyLiquidity(signer, initialAirdrop);
+    };
+
+    it("should fail if position does not exist", async () => {
+      const ADAM_SMITH = PrivateKey.random();
+      const withdrawAmount = initialAirdrop.div(UInt64.from(2));
+
+      const initBalance = await getBalance(ADAM_SMITH);
+      const initPosition = await getPosition(ADAM_SMITH);
+
+      await withdrawLiquidity(ADAM_SMITH, withdrawAmount);
+
+      const finalBalance = await getBalance(ADAM_SMITH);
+      const finalPosition = await getPosition(ADAM_SMITH);
+
+      if (initBalance === undefined) {
+        expect(finalBalance?.toBigInt()).toBeFalsy();
+      } else {
+        expect(initBalance?.toBigInt()).toBe(finalBalance?.toBigInt());
+      }
+
+      if (initPosition === undefined) {
+        expect(finalPosition?.toBigInt()).toBeFalsy();
+      } else {
+        expect(initPosition?.toBigInt()).toBe(finalPosition?.toBigInt());
+      }
+    });
+
+    it("should fail if position value is exceeded", async () => {
+      const ADAM_SMITH = PrivateKey.random();
+      const withdrawAmount = initialAirdrop.mul(UInt64.from(2));
+
+      await initConditions(ADAM_SMITH);
+      const initBalance = await getBalance(ADAM_SMITH);
+      const initPosition = await getPosition(ADAM_SMITH);
+
+      await withdrawLiquidity(ADAM_SMITH, withdrawAmount);
+
+      const finalBalance = await getBalance(ADAM_SMITH);
+      const finalPosition = await getPosition(ADAM_SMITH);
+
+      if (initBalance === undefined) {
+        expect(finalBalance?.toBigInt()).toBeFalsy();
+      } else {
+        expect(initBalance?.toBigInt()).toBe(finalBalance?.toBigInt());
+      }
+
+      if (initPosition === undefined) {
+        expect(finalPosition?.toBigInt()).toBeFalsy();
+      } else {
+        expect(initPosition?.toBigInt()).toBe(finalPosition?.toBigInt());
+      }
+    });
+
+    it("should transfer amount to user and update position", async () => {
+      const ADAM_SMITH = PrivateKey.random();
+      const withdrawAmount = initialAirdrop.div(UInt64.from(2));
+
+      await initConditions(ADAM_SMITH);
+      const initBalance = await getBalance(ADAM_SMITH);
+      const initPosition = await getPosition(ADAM_SMITH);
+
+      await withdrawLiquidity(ADAM_SMITH, withdrawAmount);
+
+      const finalBalance = await getBalance(ADAM_SMITH);
+      const finalPosition = await getPosition(ADAM_SMITH);
+
+      expect(initBalance?.add(withdrawAmount).toBigInt()).toBe(
+        finalBalance?.toBigInt(),
+      );
+      expect(initPosition?.sub(withdrawAmount).toBigInt()).toBe(
+        finalPosition?.toBigInt(),
+      );
     });
   });
 });

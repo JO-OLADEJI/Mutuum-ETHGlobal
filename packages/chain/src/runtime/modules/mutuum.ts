@@ -63,14 +63,15 @@ export class DataFeed<Config = NoConfig> extends RuntimeModule<Config> {
 
 @runtimeModule()
 export class Mutuum extends RuntimeModule<MutuumConfig> {
+  // @state() public DEBT_THRESHOLD = State.from<UInt64>(UInt64);
   @state() public CHAIN_VAULT = State.from<PublicKey>(PublicKey);
   @state() public deposits = StateMap.from<PositionKey, UInt64>(
     PositionKey,
     UInt64,
   );
-  @state() public debtPositions = StateMap.from<PublicKey, DebtPosition>(
-    PublicKey,
-    DebtPosition,
+  @state() public debts = StateMap.from<PositionKey, UInt64>(
+    PositionKey,
+    UInt64,
   );
   @state() public depositTokens = StateMap.from<PublicKey, Array<UInt64>>(
     PublicKey,
@@ -86,6 +87,7 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     @inject("DataFeed") public dataFeed: DataFeed,
   ) {
     super();
+    // this.DEBT_THRESHOLD.set(UInt64.from(75)); // 75%
   }
 
   @runtimeMethod()
@@ -170,12 +172,33 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
 
   @runtimeMethod()
   public async borrow(tokenId: TokenId, amount: UInt64) {
-    // 1. evaluate the user's deposit in USD
+    // 1. evaluate the user's debt position in USD
+    const debtUSD = await this.getDebtUSD();
+
+    // 2. evaluate the user's deposit in USD
     const depositUSD = await this.getDepositUSD();
 
-    // 2. get the borrow threshold of 75% in USD
-    // 3. evaluate the user's debt position in USD
+    // 3. get the borrow threshold of 75% in USD
+    const debtThresholdUSD = depositUSD.mul(75).div(100);
+    assert(
+      debtThresholdUSD.greaterThanOrEqual(debtUSD),
+      "Under-collateralized position!",
+    );
+    Provable.log("Debt Threshold (USD): ", debtThresholdUSD);
+
     // 4. determine how much more the user can borrow
+    const safeTokenLoans = await this.getSafeTokenLoans(
+      debtThresholdUSD.sub(debtUSD),
+    );
+    const maxTokenBorrow = safeTokenLoans[this.tokenIdToIndex(tokenId)];
+    assert(
+      maxTokenBorrow.greaterThanOrEqual(amount),
+      "Debt threshold exceeded!",
+    );
+
+    // Provable.log("Safe Loans by Token: ", safeTokenLoans);
+    // Provable.log("Token Id: ", tokenId);
+    // Provable.log("Max Token Borrow: ", maxTokenBorrow);
   }
 
   // @runtimeMethod()
@@ -207,6 +230,11 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     const depositTokenMap = await this.depositTokens.get(
       this.transaction.sender.value,
     );
+
+    if (depositTokenMap.value.length === 0) {
+      return UInt64.from(0);
+    }
+
     const depositTokenIds = this.tokenMapToTokenId(depositTokenMap.value);
 
     for (let i = 0; i < depositTokenIds.length; i++) {
@@ -219,5 +247,49 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     }
 
     return depositValueUSD;
+  }
+
+  private async getDebtUSD() {
+    let debtValueUSD = UInt64.from(0);
+    const debtTokenMap = await this.borrowedTokens.get(
+      this.transaction.sender.value,
+    );
+
+    if (debtTokenMap.value.length === 0) {
+      return UInt64.from(0);
+    }
+
+    const debtTokenIds = this.tokenMapToTokenId(debtTokenMap.value);
+
+    for (let i = 0; i < debtTokenIds.length; i++) {
+      const debt = await this.debts.get(
+        PositionKey.from(debtTokenIds[i], this.transaction.sender.value),
+      );
+      const usdRate = await this.dataFeed.getUSDRate(debtTokenIds[i]);
+      debtValueUSD = debtValueUSD.add(debt.value.mul(usdRate.value));
+      Provable.log("Debt (USD): ", debtValueUSD);
+    }
+
+    return debtValueUSD;
+  }
+
+  private async getSafeTokenLoans(safeUSDLoan: UInt64) {
+    const safeLoansIndexedByTokenId: UInt64[] = [];
+
+    for (let i = 0; i < 10; i++) {
+      const tokenUSDRate = await this.dataFeed.getUSDRate(TokenId.from(i));
+      if (
+        Number(
+          tokenUSDRate.value.equals(UInt64.from(0)).not().value.toString()[4],
+        )
+      ) {
+        const safeTokenLoan = safeUSDLoan.div(tokenUSDRate.value);
+        safeLoansIndexedByTokenId.push(safeTokenLoan);
+      } else {
+        safeLoansIndexedByTokenId.push(UInt64.from(0));
+      }
+    }
+
+    return safeLoansIndexedByTokenId;
   }
 }

@@ -87,7 +87,6 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     @inject("DataFeed") public dataFeed: DataFeed,
   ) {
     super();
-    // this.DEBT_THRESHOLD.set(UInt64.from(75)); // 75%
   }
 
   @runtimeMethod()
@@ -112,8 +111,8 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
   @runtimeMethod()
   public async supply(tokenId: TokenId, amount: UInt64) {
     const positionId = PositionKey.from(tokenId, this.transaction.sender.value);
-    const chainVaultAddr = await this.CHAIN_VAULT.get();
-    assert(chainVaultAddr.value.isEmpty().not(), "CHAIN_VAULT not set!");
+    const chainVaultAddr = (await this.CHAIN_VAULT.get()).value;
+    assert(chainVaultAddr.isEmpty().not(), "CHAIN_VAULT not set!");
 
     const depositTokenMap = await this.depositTokens.get(
       this.transaction.sender.value,
@@ -129,7 +128,7 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     await this.balances.transfer(
       tokenId,
       this.transaction.sender.value,
-      chainVaultAddr.value,
+      chainVaultAddr,
       amount,
     );
   }
@@ -172,6 +171,10 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
 
   @runtimeMethod()
   public async borrow(tokenId: TokenId, amount: UInt64) {
+    const chainVaultAddr = (await this.CHAIN_VAULT.get()).value;
+    const senderAddr = this.transaction.sender.value;
+    const positionKey = PositionKey.from(tokenId, senderAddr);
+
     // 1. evaluate the user's debt position in USD
     const debtUSD = await this.getDebtUSD();
 
@@ -184,21 +187,34 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
       debtThresholdUSD.greaterThanOrEqual(debtUSD),
       "Under-collateralized position!",
     );
-    Provable.log("Debt Threshold (USD): ", debtThresholdUSD);
 
     // 4. determine how much more the user can borrow
     const safeTokenLoans = await this.getSafeTokenLoans(
       debtThresholdUSD.sub(debtUSD),
+    );
+    const chainVaultBorrowTokenBalance = await this.balances.getBalance(
+      tokenId,
+      chainVaultAddr,
     );
     const maxTokenBorrow = safeTokenLoans[this.tokenIdToIndex(tokenId)];
     assert(
       maxTokenBorrow.greaterThanOrEqual(amount),
       "Debt threshold exceeded!",
     );
+    assert(
+      chainVaultBorrowTokenBalance.greaterThanOrEqual(amount),
+      "Insufficient vault liquidity!",
+    );
 
-    // Provable.log("Safe Loans by Token: ", safeTokenLoans);
-    // Provable.log("Token Id: ", tokenId);
-    // Provable.log("Max Token Borrow: ", maxTokenBorrow);
+    // 5. lend user the tokens
+    const outstandingTokenDebt = await this.debts.get(positionKey);
+    const debtTokenMap = await this.borrowedTokens.get(senderAddr);
+    debtTokenMap.value[this.tokenIdToIndex(tokenId)] = UInt64.from(1);
+
+    await this.debts.set(positionKey, outstandingTokenDebt.value.add(amount));
+    await this.borrowedTokens.set(senderAddr, debtTokenMap.value);
+
+    await this.balances.transfer(tokenId, chainVaultAddr, senderAddr, amount);
   }
 
   // @runtimeMethod()
@@ -243,7 +259,6 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
       );
       const usdRate = await this.dataFeed.getUSDRate(depositTokenIds[i]);
       depositValueUSD = depositValueUSD.add(dep.value.mul(usdRate.value));
-      Provable.log("Deposit (USD): ", depositValueUSD);
     }
 
     return depositValueUSD;

@@ -1,10 +1,15 @@
 import "reflect-metadata";
 import { TestingAppChain } from "@proto-kit/sdk";
-import { Mutuum, PositionKey } from "../../../src/runtime/modules/mutuum";
+import {
+  Mutuum,
+  PositionKey,
+  DataFeed,
+} from "../../../src/runtime/modules/mutuum";
 import { PrivateKey, PublicKey } from "o1js";
 import { Balances } from "../../../src/runtime/modules/balances";
 import { Balance, BalancesKey, TokenId, UInt64 } from "@proto-kit/library";
 import { NoConfig } from "@proto-kit/common";
+import { mockFetchUSDPrices } from "../../utils";
 
 const PRIVATE_KEY_LITERAL =
   "EKEyCBFAiDxVJn5G4LiJisKHqGbkHqads8b9a2iWwwGd3MfSJGy6";
@@ -14,20 +19,23 @@ describe("Mutuum", () => {
   let appChain = TestingAppChain.fromRuntime({
     Mutuum,
     Balances,
+    DataFeed,
   });
 
   const CHAIN_VAULT = PrivateKey.random();
   // const MODERATOR = PrivateKey.random();
   const MODERATOR = PrivateKey.fromBase58(PRIVATE_KEY_LITERAL);
-  const tokenId = TokenId.from(0);
+  let tokenId = TokenId.from(0);
 
   beforeAll(async () => {
     appChain = TestingAppChain.fromRuntime({
       Mutuum,
       Balances,
+      DataFeed,
     });
     appChain.configurePartial({
       Runtime: {
+        DataFeed: {},
         Mutuum: {
           moderator: MODERATOR.toPublicKey(),
         },
@@ -106,6 +114,33 @@ describe("Mutuum", () => {
     await appChain.produceBlock();
   };
 
+  const initConditions = async (
+    signer: PrivateKey,
+    dripAmount: UInt64,
+    supplyAmount?: UInt64,
+  ) => {
+    await drip(signer, dripAmount);
+    await setChainValut(MODERATOR);
+    await supplyLiquidity(signer, supplyAmount ?? dripAmount);
+  };
+
+  const setDataFeedRates = async () => {
+    appChain.setSigner(MODERATOR);
+    const usdPrices = mockFetchUSDPrices();
+
+    for (let i = 0; i < usdPrices.length; i++) {
+      const tx = await appChain.transaction(
+        MODERATOR.toPublicKey(),
+        async () => {
+          await mutuum.dataFeed.setUSDRates(TokenId.from(i), usdPrices[i]);
+        },
+      );
+      await tx.sign();
+      await tx.send();
+      await appChain.produceBlock();
+    }
+  };
+
   describe("setChainVault", () => {
     it("should fail if set by a non-authorized public key", async () => {
       const ADAM_SMITH = PrivateKey.random();
@@ -180,12 +215,19 @@ describe("Mutuum", () => {
       const chainVaultFinalBalance =
         (await getBalance(CHAIN_VAULT))?.toBigInt() ?? BigInt(0);
       const supplyPosition = await getPosition(ADAM_SMITH);
+      const depositTokenMap =
+        await appChain.query.runtime.Mutuum.depositTokens.get(
+          ADAM_SMITH.toPublicKey(),
+        );
 
       const adamSmithBalanceDelta =
         adamSmithFinalBalance - adamSmithInitBalance;
       const chainVaultBalanceDelta =
         chainVaultFinalBalance - chainValutInitBalance;
 
+      if (depositTokenMap) {
+        expect(depositTokenMap[0].toBigInt()).toBe(1n);
+      }
       expect(adamSmithBalanceDelta * -1n).toEqual(chainVaultBalanceDelta);
       expect(chainVaultBalanceDelta).toBe(supplyPosition?.toBigInt());
     });
@@ -193,12 +235,6 @@ describe("Mutuum", () => {
 
   describe("withdraw", () => {
     const initialAirdrop = UInt64.from(100);
-
-    const initConditions = async (signer: PrivateKey) => {
-      await drip(signer, initialAirdrop);
-      await setChainValut(MODERATOR);
-      await supplyLiquidity(signer, initialAirdrop);
-    };
 
     it("should fail if position does not exist", async () => {
       const ADAM_SMITH = PrivateKey.random();
@@ -229,7 +265,7 @@ describe("Mutuum", () => {
       const ADAM_SMITH = PrivateKey.random();
       const withdrawAmount = initialAirdrop.mul(UInt64.from(2));
 
-      await initConditions(ADAM_SMITH);
+      await initConditions(ADAM_SMITH, initialAirdrop);
       const initBalance = await getBalance(ADAM_SMITH);
       const initPosition = await getPosition(ADAM_SMITH);
 
@@ -255,7 +291,7 @@ describe("Mutuum", () => {
       const ADAM_SMITH = PrivateKey.random();
       const withdrawAmount = initialAirdrop.div(UInt64.from(2));
 
-      await initConditions(ADAM_SMITH);
+      await initConditions(ADAM_SMITH, initialAirdrop);
       const initBalance = await getBalance(ADAM_SMITH);
       const initPosition = await getPosition(ADAM_SMITH);
 
@@ -270,6 +306,30 @@ describe("Mutuum", () => {
       expect(initPosition?.sub(withdrawAmount).toBigInt()).toBe(
         finalPosition?.toBigInt(),
       );
+    });
+  });
+
+  describe("borrow", () => {
+    it("should lend the right amount of tokens", async () => {
+      const ADAM_SMITH = PrivateKey.random();
+      await initConditions(ADAM_SMITH, UInt64.from(100));
+      await setDataFeedRates();
+
+      tokenId = TokenId.from(1);
+      await drip(ADAM_SMITH, UInt64.from(100));
+      await supplyLiquidity(ADAM_SMITH, UInt64.from(100));
+
+      // borrow tx
+      appChain.setSigner(ADAM_SMITH);
+      const tx = await appChain.transaction(
+        ADAM_SMITH.toPublicKey(),
+        async () => {
+          await mutuum.borrow(TokenId.from(2), UInt64.from(50));
+        },
+      );
+      await tx.sign();
+      await tx.send();
+      await appChain.produceBlock();
     });
   });
 });

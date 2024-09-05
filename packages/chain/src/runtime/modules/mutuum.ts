@@ -7,7 +7,7 @@ import {
 import { State, assert, StateMap } from "@proto-kit/protocol";
 import { NoConfig } from "@proto-kit/common";
 import { Balance, TokenId, UInt64 } from "@proto-kit/library";
-import { PublicKey, Field, Bool, Struct, Poseidon, Provable } from "o1js";
+import { PublicKey, Field, Bool, Struct, Provable, provable } from "o1js";
 import { Balances } from "./balances";
 import { inject } from "tsyringe";
 
@@ -36,6 +36,31 @@ export class PositionKey extends Struct({
   }
 }
 
+export class DebtPosition extends Struct({
+  tokenId: TokenId,
+  debt: UInt64,
+}) {
+  public static from(tokenId: TokenId, address: PublicKey) {
+    return new PositionKey({ tokenId, address });
+  }
+}
+
+@runtimeModule()
+export class DataFeed<Config = NoConfig> extends RuntimeModule<Config> {
+  // tokenId => USD Rate (8 decimals precision)
+  @state() public tokenRates = StateMap.from<TokenId, UInt64>(TokenId, UInt64);
+
+  @runtimeMethod()
+  public async setUSDRates(tokenId: TokenId, usdRate: UInt64) {
+    await this.tokenRates.set(tokenId, usdRate);
+  }
+
+  @runtimeMethod()
+  public async getUSDRate(tokenId: TokenId) {
+    return await this.tokenRates.get(tokenId);
+  }
+}
+
 @runtimeModule()
 export class Mutuum extends RuntimeModule<MutuumConfig> {
   @state() public CHAIN_VAULT = State.from<PublicKey>(PublicKey);
@@ -43,8 +68,23 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     PositionKey,
     UInt64,
   );
+  @state() public debtPositions = StateMap.from<PublicKey, DebtPosition>(
+    PublicKey,
+    DebtPosition,
+  );
+  @state() public depositTokens = StateMap.from<PublicKey, Array<UInt64>>(
+    PublicKey,
+    Provable.Array(UInt64, 10),
+  );
+  @state() public borrowedTokens = StateMap.from<PublicKey, Array<UInt64>>(
+    PublicKey,
+    Provable.Array(UInt64, 10),
+  );
 
-  public constructor(@inject("Balances") public balances: Balances) {
+  public constructor(
+    @inject("Balances") public balances: Balances,
+    @inject("DataFeed") public dataFeed: DataFeed,
+  ) {
     super();
   }
 
@@ -57,8 +97,12 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     await this.CHAIN_VAULT.set(address);
   }
 
-  // @runtimeMethod()
-  // public async getHealthFactor() {}
+  @runtimeMethod()
+  public async getHealthFactor() {
+    // evaluate the user's deposit in USD
+    // evaluate the user's debt position in USD
+    // get the borrow threshold of 75% in USD
+  }
 
   // @runtimeMethod()
   // public async attemptLiquidate(target: PublicKey) {}
@@ -69,7 +113,17 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     const chainVaultAddr = await this.CHAIN_VAULT.get();
     assert(chainVaultAddr.value.isEmpty().not(), "CHAIN_VAULT not set!");
 
+    const depositTokenMap = await this.depositTokens.get(
+      this.transaction.sender.value,
+    );
+    depositTokenMap.value[this.tokenIdToIndex(tokenId)] = UInt64.from(1);
+
     await this.deposits.set(positionId, amount);
+    await this.depositTokens.set(
+      this.transaction.sender.value,
+      depositTokenMap.value,
+    );
+
     await this.balances.transfer(
       tokenId,
       this.transaction.sender.value,
@@ -92,7 +146,20 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
 
     // TODO: check for health factor before withdrawal
 
-    await this.deposits.set(positionId, currentPosition.value.sub(amount));
+    const newPosition = currentPosition.value.sub(amount);
+
+    if (newPosition.equals(UInt64.from(0))) {
+      const depositTokenMap = await this.depositTokens.get(
+        this.transaction.sender.value,
+      );
+      depositTokenMap.value[this.tokenIdToIndex(tokenId)] = UInt64.from(0);
+      await this.depositTokens.set(
+        this.transaction.sender.value,
+        depositTokenMap.value,
+      );
+    }
+
+    await this.deposits.set(positionId, newPosition);
     await this.balances.transfer(
       tokenId,
       chainVaultAddr.value,
@@ -101,9 +168,56 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     );
   }
 
-  // @runtimeMethod()
-  // public async borrow() {}
+  @runtimeMethod()
+  public async borrow(tokenId: TokenId, amount: UInt64) {
+    // 1. evaluate the user's deposit in USD
+    const depositUSD = await this.getDepositUSD();
+
+    // 2. get the borrow threshold of 75% in USD
+    // 3. evaluate the user's debt position in USD
+    // 4. determine how much more the user can borrow
+  }
 
   // @runtimeMethod()
   // public async repay() {}
+
+  // helper methods
+  private tokenIdToIndex(tokenId: TokenId) {
+    for (let i = 0; i < 10; i++) {
+      if (Number(tokenId.equals(TokenId.from(i)).value.toString()[4])) {
+        return i;
+      }
+    }
+    return 999;
+  }
+
+  private tokenMapToTokenId(map: UInt64[]) {
+    const tokenIds: TokenId[] = [];
+
+    for (let i = 0; i < map.length; i++) {
+      if (Number(map[i].equals(UInt64.from(1)).value.toString()[4])) {
+        tokenIds.push(TokenId.from(i));
+      }
+    }
+    return tokenIds;
+  }
+
+  private async getDepositUSD() {
+    let depositValueUSD = UInt64.from(0);
+    const depositTokenMap = await this.depositTokens.get(
+      this.transaction.sender.value,
+    );
+    const depositTokenIds = this.tokenMapToTokenId(depositTokenMap.value);
+
+    for (let i = 0; i < depositTokenIds.length; i++) {
+      const dep = await this.deposits.get(
+        PositionKey.from(depositTokenIds[i], this.transaction.sender.value),
+      );
+      const usdRate = await this.dataFeed.getUSDRate(depositTokenIds[i]);
+      depositValueUSD = depositValueUSD.add(dep.value.mul(usdRate.value));
+      Provable.log("Deposit (USD): ", depositValueUSD);
+    }
+
+    return depositValueUSD;
+  }
 }

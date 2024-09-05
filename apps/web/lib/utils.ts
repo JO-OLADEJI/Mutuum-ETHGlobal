@@ -11,13 +11,13 @@ export const getTokenId = (token: AppChainTokens): TokenId => {
   switch (token) {
     case "mMINA":
       return TokenId.from(0);
-    case "mBTC":
+    case "mUNI":
       return TokenId.from(1);
-    case "mETH":
+    case "mMATIC":
       return TokenId.from(2);
     case "mUSDT":
       return TokenId.from(3);
-    case "mBNB":
+    case "mARB":
       return TokenId.from(4);
     case "mLINK":
       return TokenId.from(5);

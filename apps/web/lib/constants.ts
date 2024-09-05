@@ -2,20 +2,20 @@ import { AppChainTokens } from "./types";
 
 export const TOKENS = [
   "mMINA",
-  "mBTC",
-  "mETH",
+  "mUNI",
+  "mMATIC",
   "mUSDT",
-  "mBNB",
+  "mARB",
   "mLINK",
 ] as const;
 
 // ethereum mainnet
 export const TOKENS_PRICEFEED: { [key in AppChainTokens]: `0x${string}` } = {
   mMINA: "0x",
-  mBTC: "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c",
-  mETH: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+  mUNI: "0x553303d460EE0afB37EdFf9bE42922D8FF63220e",
+  mMATIC: "0x7bAC85A8a13A4BcD8abb3eB7d6b4d632c5a57676",
   mUSDT: "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D",
-  mBNB: "0x14e613AC84a31f709eadbdF89C6CC390fDc9540A",
+  mARB: "0x31697852a68433DbCc2Ff612c516d69E3D9bd08F",
   mLINK: "0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c",
 };
 

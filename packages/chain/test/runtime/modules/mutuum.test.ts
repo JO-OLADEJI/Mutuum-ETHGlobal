@@ -121,6 +121,16 @@ describe("Mutuum", () => {
     await appChain.produceBlock();
   };
 
+  const borrow = async (signer: PrivateKey, token: TokenId, amount: UInt64) => {
+    appChain.setSigner(signer);
+    const tx = await appChain.transaction(signer.toPublicKey(), async () => {
+      await mutuum.borrow(token, amount);
+    });
+    await tx.sign();
+    await tx.send();
+    await appChain.produceBlock();
+  };
+
   const initConditions = async (
     signer: PrivateKey,
     dripAmount: UInt64,
@@ -295,13 +305,27 @@ describe("Mutuum", () => {
 
     it("should transfer amount to user and update position", async () => {
       const ADAM_SMITH = PrivateKey.random();
-      const withdrawAmount = initialAirdrop.div(UInt64.from(2));
+      const JOHN_DOE = PrivateKey.random();
+      const tokenToBorrow = TokenId.from(5);
+      const withdrawAmount = UInt64.from(10);
 
       await initConditions(ADAM_SMITH, initialAirdrop);
+      await setDataFeedRates();
+
+      // anonymous supplying liquidity to the borrowed token pool
+      tokenId = tokenToBorrow;
+      await initConditions(JOHN_DOE, UInt64.from(100), undefined, false);
+
+      await borrow(ADAM_SMITH, tokenToBorrow, UInt64.from(1));
+
+      tokenId = TokenId.from(0);
       const initBalance = await getBalance(ADAM_SMITH);
       const initPosition = await getPosition(ADAM_SMITH);
 
       await withdrawLiquidity(ADAM_SMITH, withdrawAmount);
+      const depositPosition = await appChain.query.runtime.Mutuum.deposits.get(
+        PositionKey.from(tokenId, ADAM_SMITH.toPublicKey()),
+      );
 
       const finalBalance = await getBalance(ADAM_SMITH);
       const finalPosition = await getPosition(ADAM_SMITH);

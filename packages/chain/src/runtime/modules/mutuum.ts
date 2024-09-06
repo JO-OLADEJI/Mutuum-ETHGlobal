@@ -6,22 +6,10 @@ import {
 } from "@proto-kit/module";
 import { State, assert, StateMap } from "@proto-kit/protocol";
 import { NoConfig } from "@proto-kit/common";
-import { Balance, TokenId, UInt64 } from "@proto-kit/library";
+import { TokenId, UInt64 } from "@proto-kit/library";
 import { PublicKey, Field, Bool, Struct, Provable, provable } from "o1js";
 import { Balances } from "./balances";
 import { inject } from "tsyringe";
-
-// GOAL
-// CREATE A LENDING PLATFORM LIKE AAVE that has the following features:
-// 1. Deposit tokens
-// 2. Collaterized borrowing
-// 3. Loan Repayment
-// 4. *Debt asset swap
-// 5. Health Factor
-//
-//
-// STEP 1: Write a Mina Smart contract and deploy it to an address - that's where the funds are transferred to for a Supply
-//
 
 interface MutuumConfig {
   moderator: PublicKey;
@@ -63,7 +51,6 @@ export class DataFeed<Config = NoConfig> extends RuntimeModule<Config> {
 
 @runtimeModule()
 export class Mutuum extends RuntimeModule<MutuumConfig> {
-  // @state() public DEBT_THRESHOLD = State.from<UInt64>(UInt64);
   @state() public CHAIN_VAULT = State.from<PublicKey>(PublicKey);
   @state() public deposits = StateMap.from<PositionKey, UInt64>(
     PositionKey,
@@ -98,12 +85,9 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     await this.CHAIN_VAULT.set(address);
   }
 
-  @runtimeMethod()
-  public async getHealthFactor() {
-    // evaluate the user's deposit in USD
-    // evaluate the user's debt position in USD
-    // get the borrow threshold of 75% in USD
-  }
+  // @runtimeMethod()
+  // public async getHealthFactor() {
+  // }
 
   // @runtimeMethod()
   // public async attemptLiquidate(target: PublicKey) {}
@@ -135,8 +119,9 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
 
   @runtimeMethod()
   public async withdraw(tokenId: TokenId, amount: UInt64) {
-    const positionId = PositionKey.from(tokenId, this.transaction.sender.value);
-    const chainVaultAddr = await this.CHAIN_VAULT.get();
+    const senderAddr = this.transaction.sender.value;
+    const positionId = PositionKey.from(tokenId, senderAddr);
+    const chainVaultAddr = (await this.CHAIN_VAULT.get()).value;
     const currentPosition = await this.deposits.get(positionId);
 
     assert(currentPosition.value.greaterThan(UInt64.from(0)), "Null position!");
@@ -145,14 +130,28 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
       "Position value exceeded!",
     );
 
-    // TODO: check for health factor before withdrawal
-
+    // 1. optimistically update the position
     const newPosition = currentPosition.value.sub(amount);
+    await this.deposits.set(positionId, newPosition);
 
-    if (newPosition.equals(UInt64.from(0))) {
+    // 2. calculate the deposit value after position update
+    const settledDepositUSD = await this.getDepositUSD();
+    const settledDebtThresholdUSD = settledDepositUSD.mul(75).div(100);
+
+    // 3. calculate debt threshold and require it is less or equivalent
+    const debtUSD = await this.getDebtUSD();
+
+    assert(
+      settledDebtThresholdUSD.greaterThanOrEqual(debtUSD),
+      "Position leverage exceeded!",
+    );
+
+    // 4. if position is totally closed out, update deposit-tokens map
+    if (Number(newPosition.equals(UInt64.from(0)).value.toString()[4])) {
       const depositTokenMap = await this.depositTokens.get(
         this.transaction.sender.value,
       );
+
       depositTokenMap.value[this.tokenIdToIndex(tokenId)] = UInt64.from(0);
       await this.depositTokens.set(
         this.transaction.sender.value,
@@ -160,13 +159,8 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
       );
     }
 
-    await this.deposits.set(positionId, newPosition);
-    await this.balances.transfer(
-      tokenId,
-      chainVaultAddr.value,
-      this.transaction.sender.value,
-      amount,
-    );
+    // 5. move funds from vault to user address
+    await this.balances.transfer(tokenId, chainVaultAddr, senderAddr, amount);
   }
 
   @runtimeMethod()
@@ -307,7 +301,6 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
       );
       const usdRate = await this.dataFeed.getUSDRate(debtTokenIds[i]);
       debtValueUSD = debtValueUSD.add(debt.value.mul(usdRate.value));
-      Provable.log("Debt (USD): ", debtValueUSD);
     }
 
     return debtValueUSD;

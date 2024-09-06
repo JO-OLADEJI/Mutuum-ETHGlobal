@@ -10,6 +10,7 @@ import { Balances } from "../../../src/runtime/modules/balances";
 import { Balance, BalancesKey, TokenId, UInt64 } from "@proto-kit/library";
 import { NoConfig } from "@proto-kit/common";
 import { mockFetchUSDPrices } from "../../utils";
+import { console_log } from "o1js/dist/node/bindings/compiled/node_bindings/plonk_wasm.cjs";
 
 describe("Mutuum", () => {
   let mutuum: Mutuum;
@@ -20,7 +21,6 @@ describe("Mutuum", () => {
   });
 
   const CHAIN_VAULT = PrivateKey.random();
-  // const MODERATOR = PrivateKey.random();
   const MODERATOR = PrivateKey.random();
   let tokenId = TokenId.from(0);
 
@@ -61,6 +61,16 @@ describe("Mutuum", () => {
         id ?? tokenId,
         target instanceof PublicKey ? target : target.toPublicKey(),
       ),
+    );
+  };
+
+  const getDebt = async (key: PositionKey) => {
+    return await appChain.query.runtime.Mutuum.debts.get(key);
+  };
+
+  const getDebtTokenMap = async (target: PublicKey | PrivateKey) => {
+    return await appChain.query.runtime.Mutuum.borrowedTokens.get(
+      target instanceof PublicKey ? target : target.toPublicKey(),
     );
   };
 
@@ -115,9 +125,12 @@ describe("Mutuum", () => {
     signer: PrivateKey,
     dripAmount: UInt64,
     supplyAmount?: UInt64,
+    firstCall: boolean = true,
   ) => {
     await drip(signer, dripAmount);
-    await setChainValut(MODERATOR);
+    if (firstCall) {
+      await setChainValut(MODERATOR);
+    }
     await supplyLiquidity(signer, supplyAmount ?? dripAmount);
   };
 
@@ -138,6 +151,59 @@ describe("Mutuum", () => {
     }
   };
 
+  describe("supply", () => {
+    it("should fail if CHAIN_VAULT is not set", async () => {
+      const ADAM_SMITH = PrivateKey.random();
+      await drip(ADAM_SMITH);
+      const adamSmithInitBalance = await getBalance(ADAM_SMITH);
+      await supplyLiquidity(
+        ADAM_SMITH,
+        adamSmithInitBalance
+          ? UInt64.from(adamSmithInitBalance)
+          : UInt64.from(0),
+      );
+      const adamSmithFinalBalance = await getBalance(ADAM_SMITH);
+
+      expect(adamSmithInitBalance?.toBigInt()).toEqual(
+        adamSmithFinalBalance?.toBigInt(),
+      );
+    });
+
+    it("should transfer balance to CHAIN_VAULT and update position", async () => {
+      const ADAM_SMITH = PrivateKey.random();
+      await drip(ADAM_SMITH);
+      await setChainValut(MODERATOR);
+      const adamSmithInitBalance =
+        (await getBalance(ADAM_SMITH))?.toBigInt() ?? BigInt(0);
+      const chainValutInitBalance =
+        (await getBalance(CHAIN_VAULT))?.toBigInt() ?? BigInt(0);
+      await supplyLiquidity(
+        ADAM_SMITH,
+        adamSmithInitBalance
+          ? UInt64.from(adamSmithInitBalance)
+          : UInt64.from(0),
+      );
+      const adamSmithFinalBalance =
+        (await getBalance(ADAM_SMITH))?.toBigInt() ?? BigInt(0);
+      const chainVaultFinalBalance =
+        (await getBalance(CHAIN_VAULT))?.toBigInt() ?? BigInt(0);
+      const supplyPosition = await getPosition(ADAM_SMITH);
+      const depositTokenMap =
+        await appChain.query.runtime.Mutuum.depositTokens.get(
+          ADAM_SMITH.toPublicKey(),
+        );
+      const adamSmithBalanceDelta =
+        adamSmithFinalBalance - adamSmithInitBalance;
+      const chainVaultBalanceDelta =
+        chainVaultFinalBalance - chainValutInitBalance;
+      if (depositTokenMap) {
+        expect(depositTokenMap[0].toBigInt()).toBe(1n);
+      }
+      expect(adamSmithBalanceDelta * -1n).toEqual(chainVaultBalanceDelta);
+      expect(chainVaultBalanceDelta).toBe(supplyPosition?.toBigInt());
+    });
+  });
+
   describe("setChainVault", () => {
     it("should fail if set by a non-authorized public key", async () => {
       const ADAM_SMITH = PrivateKey.random();
@@ -153,80 +219,23 @@ describe("Mutuum", () => {
       if (initChainVault === undefined) {
         expect(newChainVault).toBeUndefined();
       } else {
-        expect(initChainVault).toBe(newChainVault);
+        expect(initChainVault).toEqual(newChainVault);
       }
     });
 
-    // TODO: `fix Do not know how to serialize a BigInt at stringify` error
-    // it("should update CHAIN_VAULT when called by moderator", async () => {
-    //   const initChainVault =
-    //     await appChain.query.runtime.Mutuum.CHAIN_VAULT.get();
+    it("should update CHAIN_VAULT when called by moderator", async () => {
+      const initChainVault =
+        await appChain.query.runtime.Mutuum.CHAIN_VAULT.get();
 
-    //   await setChainValut(MODERATOR);
-
-    //   const newChainVault =
-    //     await appChain.query.runtime.Mutuum.CHAIN_VAULT.get();
-    //   expect(newChainVault).toBeDefined();
-    //   expect(newChainVault).toBe(CHAIN_VAULT);
-    // });
-  });
-
-  describe("supply", () => {
-    it("should fail if CHAIN_VAULT is not set", async () => {
-      const ADAM_SMITH = PrivateKey.random();
-      await drip(ADAM_SMITH);
-
-      const adamSmithInitBalance = await getBalance(ADAM_SMITH);
-      await supplyLiquidity(
-        ADAM_SMITH,
-        adamSmithInitBalance
-          ? UInt64.from(adamSmithInitBalance)
-          : UInt64.from(0),
-      );
-      const adamSmithFinalBalance = await getBalance(ADAM_SMITH);
-
-      expect(adamSmithInitBalance?.toBigInt()).toBe(
-        adamSmithFinalBalance?.toBigInt(),
-      );
-    });
-
-    it("should transfer balance to CHAIN_VAULT and update position", async () => {
-      const ADAM_SMITH = PrivateKey.random();
-      await drip(ADAM_SMITH);
       await setChainValut(MODERATOR);
 
-      const adamSmithInitBalance =
-        (await getBalance(ADAM_SMITH))?.toBigInt() ?? BigInt(0);
-      const chainValutInitBalance =
-        (await getBalance(CHAIN_VAULT))?.toBigInt() ?? BigInt(0);
+      const newChainVault =
+        await appChain.query.runtime.Mutuum.CHAIN_VAULT.get();
 
-      await supplyLiquidity(
-        ADAM_SMITH,
-        adamSmithInitBalance
-          ? UInt64.from(adamSmithInitBalance)
-          : UInt64.from(0),
+      expect(newChainVault).toBeDefined();
+      expect(newChainVault?.equals(CHAIN_VAULT.toPublicKey()).toBoolean()).toBe(
+        true,
       );
-
-      const adamSmithFinalBalance =
-        (await getBalance(ADAM_SMITH))?.toBigInt() ?? BigInt(0);
-      const chainVaultFinalBalance =
-        (await getBalance(CHAIN_VAULT))?.toBigInt() ?? BigInt(0);
-      const supplyPosition = await getPosition(ADAM_SMITH);
-      const depositTokenMap =
-        await appChain.query.runtime.Mutuum.depositTokens.get(
-          ADAM_SMITH.toPublicKey(),
-        );
-
-      const adamSmithBalanceDelta =
-        adamSmithFinalBalance - adamSmithInitBalance;
-      const chainVaultBalanceDelta =
-        chainVaultFinalBalance - chainValutInitBalance;
-
-      if (depositTokenMap) {
-        expect(depositTokenMap[0].toBigInt()).toBe(1n);
-      }
-      expect(adamSmithBalanceDelta * -1n).toEqual(chainVaultBalanceDelta);
-      expect(chainVaultBalanceDelta).toBe(supplyPosition?.toBigInt());
     });
   });
 
@@ -323,12 +332,10 @@ describe("Mutuum", () => {
 
       // anonymous supplying liquidity to the borrowed token pool
       tokenId = tokenToBorrow;
-      await drip(JOHN_DOE, UInt64.from(100));
-      await supplyLiquidity(JOHN_DOE, UInt64.from(100));
+      await initConditions(JOHN_DOE, UInt64.from(100), undefined, false);
 
       const initBalance = await getBalance(ADAM_SMITH, tokenToBorrow);
-      const initDebt =
-        await appChain.query.runtime.Mutuum.debts.get(positionKey);
+      const initDebt = await getDebt(positionKey);
 
       // borrow tx
       appChain.setSigner(ADAM_SMITH);
@@ -343,12 +350,8 @@ describe("Mutuum", () => {
       await appChain.produceBlock();
 
       const finalBalance = await getBalance(ADAM_SMITH, tokenToBorrow);
-      const finalDebt =
-        await appChain.query.runtime.Mutuum.debts.get(positionKey);
-      const debtTokenMap =
-        await appChain.query.runtime.Mutuum.borrowedTokens.get(
-          ADAM_SMITH.toPublicKey(),
-        );
+      const finalDebt = await getDebt(positionKey);
+      const debtTokenMap = await getDebtTokenMap(ADAM_SMITH);
 
       expect(finalDebt?.toBigInt()).toEqual(
         (initDebt?.toBigInt() ?? 0n) + amountToBorrow.toBigInt(),
@@ -359,6 +362,84 @@ describe("Mutuum", () => {
       expect(finalBalance?.toBigInt()).toBe(
         (initBalance?.toBigInt() ?? 0n) + amountToBorrow.toBigInt(),
       );
+    });
+  });
+
+  describe("repay", () => {
+    // TODO: test for all other function output
+    it("should repay the borrowed loan", async () => {
+      const ADAM_SMITH = PrivateKey.random();
+      const JOHN_DOE = PrivateKey.random();
+      const tokenToBorrowPrimitive = 4;
+      const tokenToBorrow = TokenId.from(tokenToBorrowPrimitive);
+      const amountToBorrow = UInt64.from(50);
+      const positionKey = PositionKey.from(
+        tokenToBorrow,
+        ADAM_SMITH.toPublicKey(),
+      );
+
+      await initConditions(ADAM_SMITH, UInt64.from(100));
+      await setDataFeedRates();
+
+      // anonymous supplying liquidity to the borrowed token pool
+      tokenId = tokenToBorrow;
+      await drip(ADAM_SMITH);
+      await initConditions(JOHN_DOE, UInt64.from(100), undefined, false);
+
+      // borrow tx
+      appChain.setSigner(ADAM_SMITH);
+      const tx = await appChain.transaction(
+        ADAM_SMITH.toPublicKey(),
+        async () => {
+          await mutuum.borrow(tokenToBorrow, amountToBorrow);
+        },
+      );
+      await tx.sign();
+      await tx.send();
+      await appChain.produceBlock();
+
+      const priorBalance = await getBalance(ADAM_SMITH, tokenToBorrow);
+      const priorVaultBalance = await getBalance(CHAIN_VAULT, tokenToBorrow);
+      const priorDebt = await getDebt(positionKey);
+      const priorDebtTokenMap = await getDebtTokenMap(ADAM_SMITH);
+
+      // repay tx
+      const amountToRepay = UInt64.from(amountToBorrow).sub(UInt64.from(1));
+      const tx1 = await appChain.transaction(
+        ADAM_SMITH.toPublicKey(),
+        async () => {
+          await mutuum.repay(tokenToBorrow, amountToRepay);
+        },
+      );
+      await tx1.sign();
+      await tx1.send();
+      await appChain.produceBlock();
+
+      const finalBalance = await getBalance(ADAM_SMITH, tokenToBorrow);
+      const finalVaultBalance = await getBalance(CHAIN_VAULT, tokenToBorrow);
+      const finalDebt = await getDebt(positionKey);
+      const finalDebtTokenMap = await getDebtTokenMap(ADAM_SMITH);
+
+      expect(finalDebt?.toBigInt()).toBe(
+        (priorDebt?.toBigInt() ?? 0n) - amountToRepay.toBigInt(),
+      );
+      expect(finalBalance?.toBigInt()).toBe(
+        (priorBalance?.toBigInt() ?? 0n) - amountToRepay.toBigInt(),
+      );
+      expect(finalVaultBalance?.toBigInt()).toBe(
+        (priorVaultBalance?.toBigInt() ?? 0n) + amountToRepay.toBigInt(),
+      );
+      if (amountToRepay.toBigInt() >= (priorDebt?.toBigInt() ?? 0n)) {
+        expect(
+          Boolean(finalDebtTokenMap?.[tokenToBorrowPrimitive].toBigInt()),
+        ).toBe(
+          !Boolean(priorDebtTokenMap?.[tokenToBorrowPrimitive].toBigInt()),
+        );
+      } else {
+        expect(
+          Boolean(finalDebtTokenMap?.[tokenToBorrowPrimitive].toBigInt()),
+        ).toBe(Boolean(priorDebtTokenMap?.[tokenToBorrowPrimitive].toBigInt()));
+      }
     });
   });
 });

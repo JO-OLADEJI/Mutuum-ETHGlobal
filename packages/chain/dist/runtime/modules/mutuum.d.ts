@@ -133,12 +133,17 @@ declare const DebtPosition_base: (new (value: {
 export declare class DebtPosition extends DebtPosition_base {
     static from(tokenId: TokenId, address: PublicKey): PositionKey;
 }
+export declare class DataFeed<Config = NoConfig> extends RuntimeModule<Config> {
+    tokenRates: StateMap<TokenId, UInt64>;
+    setUSDRates(tokenId: TokenId, usdRate: UInt64): Promise<void>;
+    getUSDRate(tokenId: TokenId): Promise<import("@proto-kit/protocol").Option<UInt64>>;
+}
 export declare class Mutuum extends RuntimeModule<MutuumConfig> {
     balances: Balances;
     dataFeed: DataFeed;
     CHAIN_VAULT: State<PublicKey>;
     deposits: StateMap<PositionKey, UInt64>;
-    debtPositions: StateMap<PublicKey, DebtPosition>;
+    debts: StateMap<PositionKey, UInt64>;
     depositTokens: StateMap<PublicKey, UInt64[]>;
     borrowedTokens: StateMap<PublicKey, UInt64[]>;
     constructor(balances: Balances, dataFeed: DataFeed);
@@ -147,13 +152,12 @@ export declare class Mutuum extends RuntimeModule<MutuumConfig> {
     supply(tokenId: TokenId, amount: UInt64): Promise<void>;
     withdraw(tokenId: TokenId, amount: UInt64): Promise<void>;
     borrow(tokenId: TokenId, amount: UInt64): Promise<void>;
+    repay(tokenId: TokenId, amount: UInt64): Promise<void>;
     private tokenIdToIndex;
     private tokenMapToTokenId;
-}
-export declare class DataFeed<Config = NoConfig> extends RuntimeModule<Config> {
-    tokenRates: StateMap<TokenId, UInt64>;
-    setUSDRates(tokenIds: TokenId[], usdRates: UInt64[]): Promise<void>;
-    getUSDRates(tokenIds: TokenId[]): Promise<UInt64[]>;
+    private getDepositUSD;
+    private getDebtUSD;
+    private getSafeTokenLoans;
 }
 export {};
 //# sourceMappingURL=mutuum.d.ts.map

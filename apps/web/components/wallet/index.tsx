@@ -48,9 +48,9 @@ const Wallet = ({ connectedAddress, balances, tokenPrices }: WalletProps) => {
         <Button variant="outline" size="sm" className="w-20 rounded-full">
           swap
         </Button>
-        <Button variant="outline" size="sm" className="w-20 rounded-full">
+        {/*<Button variant="outline" size="sm" className="w-20 rounded-full">
           receive
-        </Button>
+        </Button>*/}
       </div>
       {(hideZeroBalance ? tokensWithBalance : TOKENS).map((name, index) => (
         <Card

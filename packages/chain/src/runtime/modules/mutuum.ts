@@ -192,17 +192,17 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     const safeTokenLoans = await this.getSafeTokenLoans(
       debtThresholdUSD.sub(debtUSD),
     );
-    const chainVaultBorrowTokenBalance = await this.balances.getBalance(
+    const chainVaultDebtTokenBalance = await this.balances.getBalance(
       tokenId,
       chainVaultAddr,
     );
-    const maxTokenBorrow = safeTokenLoans[this.tokenIdToIndex(tokenId)];
+    const maxTokenAllowedDebt = safeTokenLoans[this.tokenIdToIndex(tokenId)];
     assert(
-      maxTokenBorrow.greaterThanOrEqual(amount),
+      maxTokenAllowedDebt.greaterThanOrEqual(amount),
       "Debt threshold exceeded!",
     );
     assert(
-      chainVaultBorrowTokenBalance.greaterThanOrEqual(amount),
+      chainVaultDebtTokenBalance.greaterThanOrEqual(amount),
       "Insufficient vault liquidity!",
     );
 
@@ -217,8 +217,33 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     await this.balances.transfer(tokenId, chainVaultAddr, senderAddr, amount);
   }
 
-  // @runtimeMethod()
-  // public async repay() {}
+  @runtimeMethod()
+  public async repay(tokenId: TokenId, amount: UInt64) {
+    // adjust borrow position
+    const chainVaultAddr = (await this.CHAIN_VAULT.get()).value;
+    const senderAddr = this.transaction.sender.value;
+    const positionKey = PositionKey.from(tokenId, senderAddr);
+    const pendingDebt = (await this.debts.get(positionKey)).value;
+
+    // if debt is totally cleared, the token map should be updated
+    if (Number(amount.greaterThanOrEqual(pendingDebt).value.toString()[4])) {
+      await this.debts.set(positionKey, UInt64.from(0));
+
+      const debtTokenMap = await this.borrowedTokens.get(senderAddr);
+      debtTokenMap.value[this.tokenIdToIndex(tokenId)] = UInt64.from(0);
+      await this.borrowedTokens.set(senderAddr, debtTokenMap.value);
+
+      await this.balances.transfer(
+        tokenId,
+        senderAddr,
+        chainVaultAddr,
+        pendingDebt,
+      );
+    } else {
+      await this.debts.set(positionKey, pendingDebt.sub(amount));
+      await this.balances.transfer(tokenId, senderAddr, chainVaultAddr, amount);
+    }
+  }
 
   // helper methods
   private tokenIdToIndex(tokenId: TokenId) {

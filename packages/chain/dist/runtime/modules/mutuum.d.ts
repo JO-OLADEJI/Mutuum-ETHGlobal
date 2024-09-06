@@ -148,7 +148,6 @@ export declare class Mutuum extends RuntimeModule<MutuumConfig> {
     borrowedTokens: StateMap<PublicKey, UInt64[]>;
     constructor(balances: Balances, dataFeed: DataFeed);
     setChainVault(address: PublicKey): Promise<void>;
-    getHealthFactor(): Promise<void>;
     supply(tokenId: TokenId, amount: UInt64): Promise<void>;
     withdraw(tokenId: TokenId, amount: UInt64): Promise<void>;
     borrow(tokenId: TokenId, amount: UInt64): Promise<void>;

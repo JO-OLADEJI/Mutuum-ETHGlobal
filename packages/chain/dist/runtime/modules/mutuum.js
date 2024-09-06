@@ -70,7 +70,6 @@ let Mutuum = class Mutuum extends RuntimeModule {
         super();
         this.balances = balances;
         this.dataFeed = dataFeed;
-        // @state() public DEBT_THRESHOLD = State.from<UInt64>(UInt64);
         this.CHAIN_VAULT = State.from(PublicKey);
         this.deposits = StateMap.from(PositionKey, UInt64);
         this.debts = StateMap.from(PositionKey, UInt64);
@@ -81,11 +80,9 @@ let Mutuum = class Mutuum extends RuntimeModule {
         assert(this.transaction.sender.value.equals(this.config.moderator), "Unauthorized!");
         await this.CHAIN_VAULT.set(address);
     }
-    async getHealthFactor() {
-        // evaluate the user's deposit in USD
-        // evaluate the user's debt position in USD
-        // get the borrow threshold of 75% in USD
-    }
+    // @runtimeMethod()
+    // public async getHealthFactor() {
+    // }
     // @runtimeMethod()
     // public async attemptLiquidate(target: PublicKey) {}
     async supply(tokenId, amount) {
@@ -99,20 +96,29 @@ let Mutuum = class Mutuum extends RuntimeModule {
         await this.balances.transfer(tokenId, this.transaction.sender.value, chainVaultAddr, amount);
     }
     async withdraw(tokenId, amount) {
-        const positionId = PositionKey.from(tokenId, this.transaction.sender.value);
-        const chainVaultAddr = await this.CHAIN_VAULT.get();
+        const senderAddr = this.transaction.sender.value;
+        const positionId = PositionKey.from(tokenId, senderAddr);
+        const chainVaultAddr = (await this.CHAIN_VAULT.get()).value;
         const currentPosition = await this.deposits.get(positionId);
         assert(currentPosition.value.greaterThan(UInt64.from(0)), "Null position!");
         assert(currentPosition.value.greaterThanOrEqual(amount), "Position value exceeded!");
-        // TODO: check for health factor before withdrawal
+        // 1. optimistically update the position
         const newPosition = currentPosition.value.sub(amount);
-        if (newPosition.equals(UInt64.from(0))) {
+        await this.deposits.set(positionId, newPosition);
+        // 2. calculate the deposit value after position update
+        const settledDepositUSD = await this.getDepositUSD();
+        const settledDebtThresholdUSD = settledDepositUSD.mul(75).div(100);
+        // 3. calculate debt threshold and require it is less or equivalent
+        const debtUSD = await this.getDebtUSD();
+        assert(settledDebtThresholdUSD.greaterThanOrEqual(debtUSD), "Position leverage exceeded!");
+        // 4. if position is totally closed out, update deposit-tokens map
+        if (Number(newPosition.equals(UInt64.from(0)).value.toString()[4])) {
             const depositTokenMap = await this.depositTokens.get(this.transaction.sender.value);
             depositTokenMap.value[this.tokenIdToIndex(tokenId)] = UInt64.from(0);
             await this.depositTokens.set(this.transaction.sender.value, depositTokenMap.value);
         }
-        await this.deposits.set(positionId, newPosition);
-        await this.balances.transfer(tokenId, chainVaultAddr.value, this.transaction.sender.value, amount);
+        // 5. move funds from vault to user address
+        await this.balances.transfer(tokenId, chainVaultAddr, senderAddr, amount);
     }
     async borrow(tokenId, amount) {
         const chainVaultAddr = (await this.CHAIN_VAULT.get()).value;
@@ -144,7 +150,7 @@ let Mutuum = class Mutuum extends RuntimeModule {
         const chainVaultAddr = (await this.CHAIN_VAULT.get()).value;
         const senderAddr = this.transaction.sender.value;
         const positionKey = PositionKey.from(tokenId, senderAddr);
-        const pendingDebt = await this.balances.getBalance(tokenId, senderAddr);
+        const pendingDebt = (await this.debts.get(positionKey)).value;
         // if debt is totally cleared, the token map should be updated
         if (Number(amount.greaterThanOrEqual(pendingDebt).value.toString()[4])) {
             await this.debts.set(positionKey, UInt64.from(0));
@@ -201,7 +207,6 @@ let Mutuum = class Mutuum extends RuntimeModule {
             const debt = await this.debts.get(PositionKey.from(debtTokenIds[i], this.transaction.sender.value));
             const usdRate = await this.dataFeed.getUSDRate(debtTokenIds[i]);
             debtValueUSD = debtValueUSD.add(debt.value.mul(usdRate.value));
-            Provable.log("Debt (USD): ", debtValueUSD);
         }
         return debtValueUSD;
     }
@@ -246,12 +251,6 @@ __decorate([
     __metadata("design:paramtypes", [PublicKey]),
     __metadata("design:returntype", Promise)
 ], Mutuum.prototype, "setChainVault", null);
-__decorate([
-    runtimeMethod(),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], Mutuum.prototype, "getHealthFactor", null);
 __decorate([
     runtimeMethod(),
     __metadata("design:type", Function),

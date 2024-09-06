@@ -48,7 +48,6 @@ const useTokenPricesUSD = () => {
       otherPrices.forEach((value, index) => {
         priceMap[TOKENS[index + 1]] = formatUnits(value[1], 8);
       });
-      console.log({ priceMap });
       setTokenPrices(() => priceMap);
     } catch (error) {
       console.error(error);

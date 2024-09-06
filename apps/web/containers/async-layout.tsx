@@ -32,14 +32,14 @@ export default function AsyncLayout({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <Header
+      {/*<Header
         loading={clientStore.loading}
         balance={balancesStore.balances[walletStore.wallet ?? ""]?.["mMINA"]}
         balanceLoading={loading}
         wallet={walletStore.wallet}
         onConnectWallet={walletStore.connectWallet}
         blockHeight={chainStore.block?.height ?? "-"}
-      />
+      />*/}
       {children}
       <Toaster />
     </>

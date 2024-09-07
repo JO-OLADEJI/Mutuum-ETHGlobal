@@ -23,8 +23,8 @@ jobs:
             npm install -g pnpm
 
       # Step 3: Install npm dependencies
-      - name: Install npm dependencies
-        run: pnpm i
+    #   - name: Install npm dependencies
+    #     run: pnpm i
 
       # Step 4: Copy files to the target directory
       - name: Copy files to target directory

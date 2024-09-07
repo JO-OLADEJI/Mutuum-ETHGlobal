@@ -18,9 +18,13 @@ jobs:
         with:
           node-version: '18' # Specify the Node.js version you want to use
 
+      - name: Install pnpm
+        run: |
+            npm install -g pnpm
+
       # Step 3: Install npm dependencies
       - name: Install npm dependencies
-        run: npm install
+        run: pnpm i
 
       # Step 4: Copy files to the target directory
       - name: Copy files to target directory

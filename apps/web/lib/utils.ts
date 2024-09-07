@@ -23,3 +23,19 @@ export const getTokenId = (token: AppChainTokens): TokenId => {
       return TokenId.from(5);
   }
 };
+
+export const truncateAddress = (
+  address: string,
+  startChars = 7,
+  endChars = 7,
+): string => {
+  if (address.length <= startChars + endChars) {
+    return address; // If address is too short, return it as is
+  }
+
+  const start = address.slice(0, startChars);
+  const end = address.slice(-endChars);
+  const ellipsis = "...";
+
+  return `${start}${ellipsis}${end}`;
+};

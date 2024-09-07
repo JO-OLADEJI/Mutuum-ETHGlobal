@@ -30,7 +30,7 @@ jobs:
       - name: Copy files to target directory
         run: |
           TARGET_DIR="/mutuum-ethglobal" # Define the target directory
-          cd ~ &&  rsync -av --exclude='.git' . $TARGET_DIR
+          cd ~ && sudo rsync -av --exclude='.git' . $TARGET_DIR
 
       # Step 5: Navigate to the target directory and run npm start
       - name: Start application

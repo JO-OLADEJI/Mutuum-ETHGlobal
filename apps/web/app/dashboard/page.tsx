@@ -5,15 +5,33 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
 import { truncateAddress } from "@/lib/utils";
 import SidePanel from "./side-panel";
+import { useEffect, useState } from "react";
+import { useBalancesStore } from "@/lib/stores/balances";
+import useTokenPricesUSD from "@/lib/stores/rates";
+import { Separator } from "@/components/ui/separator";
+import { TOKENS } from "@/lib/constants";
+import { Card } from "@/components/ui/card";
+import { Avatar } from "@radix-ui/react-avatar";
+import { AvatarFallback } from "@/components/ui/avatar";
 
 // assets
 import dogecoin from "@/public/dogecoin.png";
-import { useState } from "react";
+import hodl from "@/public/hodl.png";
+import coin from "@/public/coin.png";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Accordion } from "@/components/ui/accordion";
+import Supply from "./items/supply";
 
 const Dashboard = () => {
   const { wallet, connectWallet } = useWalletStore();
   const [networth, setNetworth] = useState<string>("");
   const [healthFactor, setHealthFactor] = useState<number>(0);
+  const { balances } = useBalancesStore();
+  const tokenPrices = useTokenPricesUSD();
+  const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(false);
+  const tokensWithBalance = TOKENS.filter(
+    (name) => balances[wallet ?? ""]?.[name] !== "0",
+  );
 
   return (
     <Sheet>
@@ -32,29 +50,32 @@ const Dashboard = () => {
         )}
       </nav>
 
-      <div className="mx-auto my-12 w-10/12">
-        <h1 className="text-gray3 text-5xl font-black">Portfolio</h1>
-        <div className="mt-4 flex items-start gap-12">
-          <div>
-            <p className="text-gray5 text-sm">Net Worth</p>
-            <h1 className="text-gray3 text-3xl font-black">
-              {networth ? (
-                <>
-                  <span>$</span>
-                  {networth}
-                </>
-              ) : (
-                "-"
-              )}
-            </h1>
-          </div>
-          <div>
-            <p className="text-gray5 text-sm">Health Factor</p>
-            <h1 className="text-gray3 text-3xl font-black">
-              {healthFactor ? healthFactor : "-"}
-            </h1>
+      <div className="mx-auto my-12 flex w-10/12 items-center justify-between">
+        <div>
+          <h1 className="text-gray3 text-5xl font-black">Portfolio</h1>
+          <div className="mt-4 flex items-start gap-12">
+            <div>
+              <p className="text-gray5 text-sm">Net Worth</p>
+              <h1 className="text-gray3 text-3xl font-black">
+                {networth ? (
+                  <>
+                    <span>$</span>
+                    {networth}
+                  </>
+                ) : (
+                  "-"
+                )}
+              </h1>
+            </div>
+            <div>
+              <p className="text-gray5 text-sm">Health Factor</p>
+              <h1 className="text-gray3 text-3xl font-black">
+                {healthFactor ? healthFactor : "-"}
+              </h1>
+            </div>
           </div>
         </div>
+        <Image src={hodl} alt="crypto portfolio" width={200} height={200} />
       </div>
 
       {!wallet ? (
@@ -78,7 +99,85 @@ const Dashboard = () => {
             Connect wallet
           </Button>
         </div>
-      ) : null}
+      ) : (
+        <div className="mx-auto flex w-10/12 items-start justify-between gap-x-2.5">
+          <div className="border-graye w-6/12 rounded border border-solid">
+            <div className="p-3 pb-7">
+              <h1 className="text-gray5 font-bold">
+                Assets -{" "}
+                <span className="text-xs font-bold">[eligible to stake]</span>
+              </h1>
+              <div className="flex items-center">
+                <Checkbox
+                  id="hide-0"
+                  className="mr-1 h-3.5 w-3.5"
+                  checked={hideZeroBalance}
+                  onCheckedChange={() => setHideZeroBalance((prev) => !prev)}
+                />
+                <label htmlFor="hide-0" className="text-gray7 text-xs">
+                  hide zero balace
+                </label>
+              </div>
+            </div>
+            <div className="text-gray7 grid grid-cols-4 px-2 text-xs font-semibold">
+              <p>Asset</p>
+              <p>Balance</p>
+              <p>Collateral</p>
+            </div>
+            <Accordion type="single" collapsible>
+              {(hideZeroBalance ? tokensWithBalance : TOKENS).map(
+                (name, index) => (
+                  <Supply
+                    key={index}
+                    tokenName={name}
+                    balance={balances[wallet]?.[name]}
+                    tokenPrice={tokenPrices[name]}
+                  />
+                ),
+              )}
+            </Accordion>
+            {/*(hideZeroBalance ? tokensWithBalance : TOKENS).map(
+              (name, index) => (
+                <div
+                  key={index}
+                  className="border-graye grid grid-cols-4 border-t border-solid p-2"
+                >
+                  <div className="flex items-center">
+                    <p className="text-xs">{name}</p>
+                  </div>
+                  <div className="text-sm">
+                    <p>{balances[wallet]?.[name] ?? "0"}</p>
+                    <p className="text-[9px] font-extrabold">
+                      {!balances[wallet]?.[name]
+                        ? "0"
+                        : tokenPrices[name]
+                          ? (
+                              Number(balances[wallet][name]) *
+                              Number(tokenPrices[name])
+                            ).toLocaleString("en-US", {
+                              style: "currency",
+                              currency: "USD",
+                            })
+                          : "-"}
+                    </p>
+                  </div>
+                  <div className="flex items-center">
+                    <p className="text-xs">Toggle</p>
+                  </div>
+                  <div className="text-center">
+                    <Button size={"sm"} variant={"outline"} className="w-fit">
+                      Supply
+                    </Button>
+                  </div>
+                </div>
+              ),
+            )*/}
+          </div>
+          <div className="border-graye h-96 w-6/12 rounded-sm border border-solid">
+            <h1>Borrow</h1>
+          </div>
+        </div>
+      )}
     </Sheet>
   );
 };

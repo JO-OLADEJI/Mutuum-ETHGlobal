@@ -2,12 +2,12 @@ import { Button } from "@/components/ui/button";
 import protokit from "@/public/protokit-zinc.svg";
 import Image from "next/image";
 // @ts-ignore
-import truncateMiddle from "truncate-middle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Chain } from "./chain";
 import { Separator } from "./ui/separator";
 import { TOKENS } from "@/lib/constants";
 import { useAppStore } from "@/lib/stores/app";
+import { truncateAddress } from "@/lib/utils";
 
 export interface HeaderProps {
   loading: boolean;
@@ -59,9 +59,7 @@ export default function Header({
           )}
           {/* connect wallet */}
           <Button loading={loading} className="w-44" onClick={onConnectWallet}>
-            <div>
-              {wallet ? truncateMiddle(wallet, 7, 7, "...") : "Connect wallet"}
-            </div>
+            <div>{wallet ? truncateAddress(wallet) : "Connect wallet"}</div>
           </Button>
         </div>
       </div>

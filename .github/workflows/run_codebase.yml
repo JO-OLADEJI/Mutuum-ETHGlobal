@@ -1,0 +1,39 @@
+name: Deploy to Self-Hosted Server
+
+on:
+  push:
+    branches: [ master]
+
+jobs:
+  deploy:
+    runs-on: self-hosted # This uses your self-hosted runner
+    steps:
+      # Step 1: Checkout the code from GitHub
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18' # Specify the Node.js version you want to use
+
+      - name: Install pnpm
+        run: |
+            npm install -g pnpm
+
+      # Step 3: Install npm dependencies
+    #   - name: Install npm dependencies
+    #     run: pnpm i
+
+      # Step 4: Copy files to the target directory
+      - name: Copy files to target directory
+        run: |
+          TARGET_DIR="/mutuum-ethglobal" # Define the target directory
+          sudo rsync -av --exclude='.git' . $TARGET_DIR
+
+      # Step 5: Navigate to the target directory and run npm start
+    #   - name: Start application
+    #     run: |
+    #       cd mutuum-ethglobal
+    #       pnpm env:inmemory dev --filter chain

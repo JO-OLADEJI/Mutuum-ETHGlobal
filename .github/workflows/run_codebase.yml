@@ -29,7 +29,7 @@ jobs:
       # Step 4: Copy files to the target directory
       - name: Copy files to target directory
         run: |
-          TARGET_DIR="mutuum-ethglobal" # Define the target directory
+          TARGET_DIR="/mutuum-ethglobal" # Define the target directory
           sudo rsync -av --exclude='.git' . $TARGET_DIR
 
       # Step 5: Navigate to the target directory and run npm start

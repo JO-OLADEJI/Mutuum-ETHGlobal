@@ -2,8 +2,7 @@ name: Deploy to Self-Hosted Server
 
 on:
   push:
-    branches:
-      - main # Triggers on push to the main branch
+    branches: [ master]
 
 jobs:
   deploy:

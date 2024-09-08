@@ -11,6 +11,7 @@ import useTokenPricesUSD from "@/lib/stores/rates";
 import { TOKENS } from "@/lib/constants";
 import dogecoin from "@/public/dogecoin.png";
 import hodl from "@/public/hodl.png";
+import blockchain from "@/public/blockchain.png";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion } from "@/components/ui/accordion";
 import Supply from "./items/supply";
@@ -24,8 +25,10 @@ import { TokenId } from "@proto-kit/library";
 import Withdraw from "./items/withdraw";
 import Borrow from "./items/borrow";
 import Repay from "./items/repay";
+import { useChainStore } from "@/lib/stores/chain";
 
 const Dashboard = () => {
+  const chainStore = useChainStore();
   const { wallet, connectWallet } = useWalletStore();
   const [healthFactor, setHealthFactor] = useState<number>(0);
   const { balances } = useBalancesStore();
@@ -48,10 +51,19 @@ const Dashboard = () => {
   return (
     <Sheet>
       <SidePanel />
-      <nav className="flex justify-between px-12 py-4">
-        <div>
-          {/*<Image src={} alt="" width={} height={} />*/}
-          <h1>Mutuum Protocol</h1>
+      <nav className="flex items-center justify-between px-12 py-4">
+        <div className="flex">
+          <h1 className="font-mono text-xl font-black">MUTUUM.PRTC</h1>
+          <div className="flex h-4 items-center justify-center rounded-full bg-black px-2 text-[8px] font-extrabold text-white">
+            <p>BETA</p>
+          </div>
+        </div>
+        <div className="flex items-center">
+          <div className={"mr-1 h-2 w-2 rounded-full bg-green-400"} />
+          <Image src={blockchain} alt="blockchain" width={50} height={50} />
+          <p className="ml-2 text-2xl font-extrabold">
+            {chainStore.block?.height ?? "-"}
+          </p>
         </div>
         {!wallet ? (
           <Button onClick={connectWallet}>Connect wallet</Button>
@@ -238,7 +250,7 @@ const Dashboard = () => {
           </div>
         </>
       )}
-      <div className="footer h-24" />
+      <div className="footer h-48" />
     </Sheet>
   );
 };

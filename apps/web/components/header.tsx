@@ -26,8 +26,6 @@ export default function Header({
   balanceLoading,
   blockHeight,
 }: HeaderProps) {
-  const { activeTokenId } = useAppStore();
-
   return (
     <div className="flex items-center justify-between border-b p-2 shadow-sm">
       <div className="container flex">
@@ -40,7 +38,7 @@ export default function Header({
         </div>
         <div className="flex basis-6/12 flex-row items-center justify-end">
           {/* balance */}
-          {wallet && (
+          {/*wallet && (
             <div className="mr-4 flex shrink flex-col items-end justify-center">
               <div>
                 <p className="text-xs">Your balance</p>
@@ -56,7 +54,7 @@ export default function Header({
                 </p>
               </div>
             </div>
-          )}
+          )*/}
           {/* connect wallet */}
           <Button loading={loading} className="w-44" onClick={onConnectWallet}>
             <div>{wallet ? truncateAddress(wallet) : "Connect wallet"}</div>

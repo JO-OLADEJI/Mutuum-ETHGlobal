@@ -14,9 +14,9 @@ export const useDatafeed = () => {
   const tokenPrices = useTokenPricesUSD();
 
   return useCallback(async () => {
-    if (!wallet || !client) return;
+    // if (!wallet || !client) return;
 
-    const mutuum = client.runtime.resolve("Mutuum");
+    const mutuum = client!!.runtime.resolve("Mutuum");
     const data = USDRates.empty();
 
     for (let i = 0; i < TOKENS.length; i++) {
@@ -26,8 +26,8 @@ export const useDatafeed = () => {
       );
     }
 
-    const tx = await client.transaction(
-      PublicKey.fromBase58(wallet),
+    const tx = await client!!.transaction(
+      PublicKey.fromBase58(wallet!!),
       async () => {
         mutuum.dataFeed.setUSDRates(data);
       },

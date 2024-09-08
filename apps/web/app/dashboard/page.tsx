@@ -21,16 +21,17 @@ import coin from "@/public/coin.png";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion } from "@/components/ui/accordion";
 import Supply from "./items/supply";
-import { useMutuumStore } from "@/lib/stores/mutuum";
+import { useDepositUSD, useMutuumStore } from "@/lib/stores/mutuum";
 import { useClientStore } from "@/lib/stores/client";
 import { TokenId } from "@proto-kit/library";
 
 const Dashboard = () => {
   const { wallet, connectWallet } = useWalletStore();
-  const [networth, setNetworth] = useState<string>("");
+  // const [networth, setNetworth] = useState<string>("");
   const [healthFactor, setHealthFactor] = useState<number>(0);
   const { balances } = useBalancesStore();
   const tokenPrices = useTokenPricesUSD();
+  const { depositUSD, totalUSD } = useDepositUSD();
   const { client } = useClientStore();
   const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(false);
   const tokensWithBalance = TOKENS.filter(
@@ -61,11 +62,13 @@ const Dashboard = () => {
             <div>
               <p className="text-gray5 text-sm">Net Worth</p>
               <h1 className="text-gray3 text-3xl font-black">
-                {networth ? (
-                  <>
-                    <span>$</span>
-                    {networth}
-                  </>
+                {totalUSD ? (
+                  <span>
+                    {totalUSD.toLocaleString("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                    })}
+                  </span>
                 ) : (
                   "-"
                 )}
@@ -133,7 +136,6 @@ const Dashboard = () => {
                 (name, index) => (
                   <Supply
                     key={index}
-                    tokenId={TokenId.from(index)}
                     tokenName={name}
                     balance={balances[wallet]?.[name]}
                     tokenPrice={tokenPrices[name]}

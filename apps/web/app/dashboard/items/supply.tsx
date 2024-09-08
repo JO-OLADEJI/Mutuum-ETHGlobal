@@ -9,17 +9,17 @@ import { Switch } from "@/components/ui/switch";
 import { useClientStore } from "@/lib/stores/client";
 import { useMutuumStore } from "@/lib/stores/mutuum";
 import { AppChainTokens } from "@/lib/types";
+import { getTokenId } from "@/lib/utils";
 import { TokenId, UInt64 } from "@proto-kit/library";
 import { useState } from "react";
 
 interface SupplyProps {
   tokenName: AppChainTokens;
-  tokenId: TokenId;
   balance: string | undefined;
   tokenPrice: string | undefined;
 }
 
-const Supply = ({ tokenName, tokenId, balance, tokenPrice }: SupplyProps) => {
+const Supply = ({ tokenName, balance, tokenPrice }: SupplyProps) => {
   const { client } = useClientStore();
   const { supply: stake } = useMutuumStore();
   const [amount, setAmount] = useState<string>("");
@@ -71,7 +71,7 @@ const Supply = ({ tokenName, tokenId, balance, tokenPrice }: SupplyProps) => {
             className="w-[49%]"
             disabled={amount === "0" || amount === ""}
             onClick={async () => {
-              await stake(client!!, tokenId, UInt64.from(amount));
+              await stake(client!!, getTokenId(tokenName), UInt64.from(amount));
               setAmount("");
             }}
           >

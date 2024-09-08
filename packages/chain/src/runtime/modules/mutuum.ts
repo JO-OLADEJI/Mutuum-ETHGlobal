@@ -263,7 +263,8 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     return tokenIds;
   }
 
-  private async getDepositUSD() {
+  @runtimeMethod()
+  public async getDepositUSD() {
     let depositValueUSD = UInt64.from(0);
     const depositTokenMap = await this.depositTokens.get(
       this.transaction.sender.value,

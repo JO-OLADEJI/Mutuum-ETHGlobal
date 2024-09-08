@@ -33,6 +33,15 @@ export class DebtPosition extends Struct({
   }
 }
 
+class Token extends Struct({
+  identifier: Provable.Array(UInt64, 10),
+}) {
+  public static empty(): Token {
+    const identifier = Array<UInt64>(10).fill(UInt64.from(0));
+    return new Token({ identifier });
+  }
+}
+
 @runtimeModule()
 export class DataFeed<Config = NoConfig> extends RuntimeModule<Config> {
   // tokenId => USD Rate (8 decimals precision)
@@ -60,14 +69,22 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     PositionKey,
     UInt64,
   );
-  @state() public depositTokens = StateMap.from<PublicKey, Array<UInt64>>(
+  @state() public depositTokens = StateMap.from<PublicKey, Token>(
     PublicKey,
-    Provable.Array(UInt64, 10),
+    Token,
   );
-  @state() public borrowedTokens = StateMap.from<PublicKey, Array<UInt64>>(
+  // @state() public depositTokens = StateMap.from<PublicKey, Array<UInt64>>(
+  //   PublicKey,
+  //   Provable.Array(UInt64, 10),
+  // );
+  @state() public borrowedTokens = StateMap.from<PublicKey, Token>(
     PublicKey,
-    Provable.Array(UInt64, 10),
+    Token,
   );
+  // @state() public borrowedTokens = StateMap.from<PublicKey, Array<UInt64>>(
+  //   PublicKey,
+  //   Provable.Array(UInt64, 10),
+  // );
 
   public constructor(
     @inject("Balances") public balances: Balances,
@@ -101,7 +118,8 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     const depositTokenMap = await this.depositTokens.get(
       this.transaction.sender.value,
     );
-    depositTokenMap.value[this.tokenIdToIndex(tokenId)] = UInt64.from(1);
+    depositTokenMap.value.identifier[this.tokenIdToIndex(tokenId)] =
+      UInt64.from(1);
 
     await this.deposits.set(positionId, amount);
     await this.depositTokens.set(
@@ -152,7 +170,8 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
         this.transaction.sender.value,
       );
 
-      depositTokenMap.value[this.tokenIdToIndex(tokenId)] = UInt64.from(0);
+      depositTokenMap.value.identifier[this.tokenIdToIndex(tokenId)] =
+        UInt64.from(0);
       await this.depositTokens.set(
         this.transaction.sender.value,
         depositTokenMap.value,
@@ -203,7 +222,8 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     // 5. lend user the tokens
     const outstandingTokenDebt = await this.debts.get(positionKey);
     const debtTokenMap = await this.borrowedTokens.get(senderAddr);
-    debtTokenMap.value[this.tokenIdToIndex(tokenId)] = UInt64.from(1);
+    debtTokenMap.value.identifier[this.tokenIdToIndex(tokenId)] =
+      UInt64.from(1);
 
     await this.debts.set(positionKey, outstandingTokenDebt.value.add(amount));
     await this.borrowedTokens.set(senderAddr, debtTokenMap.value);
@@ -224,7 +244,8 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
       await this.debts.set(positionKey, UInt64.from(0));
 
       const debtTokenMap = await this.borrowedTokens.get(senderAddr);
-      debtTokenMap.value[this.tokenIdToIndex(tokenId)] = UInt64.from(0);
+      debtTokenMap.value.identifier[this.tokenIdToIndex(tokenId)] =
+        UInt64.from(0);
       await this.borrowedTokens.set(senderAddr, debtTokenMap.value);
 
       await this.balances.transfer(
@@ -266,11 +287,13 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
       this.transaction.sender.value,
     );
 
-    if (depositTokenMap.value.length === 0) {
+    if (depositTokenMap.value.identifier.length === 0) {
       return UInt64.from(0);
     }
 
-    const depositTokenIds = this.tokenMapToTokenId(depositTokenMap.value);
+    const depositTokenIds = this.tokenMapToTokenId(
+      depositTokenMap.value.identifier,
+    );
 
     for (let i = 0; i < depositTokenIds.length; i++) {
       const dep = await this.deposits.get(
@@ -289,11 +312,11 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
       this.transaction.sender.value,
     );
 
-    if (debtTokenMap.value.length === 0) {
+    if (debtTokenMap.value.identifier.length === 0) {
       return UInt64.from(0);
     }
 
-    const debtTokenIds = this.tokenMapToTokenId(debtTokenMap.value);
+    const debtTokenIds = this.tokenMapToTokenId(debtTokenMap.value.identifier);
 
     for (let i = 0; i < debtTokenIds.length; i++) {
       const debt = await this.debts.get(

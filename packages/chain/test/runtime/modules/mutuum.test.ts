@@ -10,7 +10,6 @@ import { Balances } from "../../../src/runtime/modules/balances";
 import { Balance, BalancesKey, TokenId, UInt64 } from "@proto-kit/library";
 import { NoConfig } from "@proto-kit/common";
 import { mockFetchUSDPrices } from "../../utils";
-import { console_log } from "o1js/dist/node/bindings/compiled/node_bindings/plonk_wasm.cjs";
 
 describe("Mutuum", () => {
   let mutuum: Mutuum;
@@ -207,7 +206,7 @@ describe("Mutuum", () => {
       const chainVaultBalanceDelta =
         chainVaultFinalBalance - chainValutInitBalance;
       if (depositTokenMap) {
-        expect(depositTokenMap[0].toBigInt()).toBe(1n);
+        expect(depositTokenMap.identifier[0].toBigInt()).toBe(1n);
       }
       expect(adamSmithBalanceDelta * -1n).toEqual(chainVaultBalanceDelta);
       expect(chainVaultBalanceDelta).toBe(supplyPosition?.toBigInt());
@@ -380,9 +379,9 @@ describe("Mutuum", () => {
       expect(finalDebt?.toBigInt()).toEqual(
         (initDebt?.toBigInt() ?? 0n) + amountToBorrow.toBigInt(),
       );
-      expect(debtTokenMap?.[Number(tokenToBorrow.toBigInt())].toBigInt()).toBe(
-        1n,
-      );
+      expect(
+        debtTokenMap?.identifier?.[Number(tokenToBorrow.toBigInt())].toBigInt(),
+      ).toBe(1n);
       expect(finalBalance?.toBigInt()).toBe(
         (initBalance?.toBigInt() ?? 0n) + amountToBorrow.toBigInt(),
       );
@@ -455,14 +454,24 @@ describe("Mutuum", () => {
       );
       if (amountToRepay.toBigInt() >= (priorDebt?.toBigInt() ?? 0n)) {
         expect(
-          Boolean(finalDebtTokenMap?.[tokenToBorrowPrimitive].toBigInt()),
+          Boolean(
+            finalDebtTokenMap?.identifier?.[tokenToBorrowPrimitive].toBigInt(),
+          ),
         ).toBe(
-          !Boolean(priorDebtTokenMap?.[tokenToBorrowPrimitive].toBigInt()),
+          !Boolean(
+            priorDebtTokenMap?.identifier?.[tokenToBorrowPrimitive].toBigInt(),
+          ),
         );
       } else {
         expect(
-          Boolean(finalDebtTokenMap?.[tokenToBorrowPrimitive].toBigInt()),
-        ).toBe(Boolean(priorDebtTokenMap?.[tokenToBorrowPrimitive].toBigInt()));
+          Boolean(
+            finalDebtTokenMap?.identifier?.[tokenToBorrowPrimitive].toBigInt(),
+          ),
+        ).toBe(
+          Boolean(
+            priorDebtTokenMap?.identifier?.[tokenToBorrowPrimitive].toBigInt(),
+          ),
+        );
       }
     });
   });

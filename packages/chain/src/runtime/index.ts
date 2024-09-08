@@ -18,7 +18,11 @@ export const config: ModulesConfig<typeof modules> = {
   DataFeed: {},
   Mutuum: {
     moderator: PublicKey.fromBase58(
+      // TODO: read this from a config file
       "B62qpoD3dHu9w69bJkGfujATwMAHiK6AoAzANez8pyghCvbw3koha13",
+    ),
+    CHAIN_VAULT: PublicKey.fromBase58(
+      "B62qqetDk1TAG3sso1CtgZ9MvLYu6msUiBtSukvSeCxsshQmvJM9eDe",
     ),
   },
 };

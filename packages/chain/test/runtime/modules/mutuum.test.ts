@@ -8,7 +8,6 @@ import {
 import { PrivateKey, PublicKey } from "o1js";
 import { Balances } from "../../../src/runtime/modules/balances";
 import { Balance, BalancesKey, TokenId, UInt64 } from "@proto-kit/library";
-import { NoConfig } from "@proto-kit/common";
 import { mockFetchUSDPrices } from "../../utils";
 
 describe("Mutuum", () => {
@@ -19,7 +18,7 @@ describe("Mutuum", () => {
     DataFeed,
   });
 
-  const CHAIN_VAULT = PrivateKey.random();
+  const CHAIN_VAULT_CONFIG = PrivateKey.random().toPublicKey();
   const MODERATOR = PrivateKey.random();
   let tokenId = TokenId.from(0);
 
@@ -34,6 +33,7 @@ describe("Mutuum", () => {
         DataFeed: {},
         Mutuum: {
           moderator: MODERATOR.toPublicKey(),
+          CHAIN_VAULT: CHAIN_VAULT_CONFIG,
         },
         Balances: {
           totalSupply: Balance.from(21_000_000),
@@ -87,19 +87,6 @@ describe("Mutuum", () => {
     await appChain.produceBlock();
   };
 
-  const setChainValut = async (signer?: PrivateKey) => {
-    appChain.setSigner(signer ?? MODERATOR);
-    const tx = await appChain.transaction(
-      (signer ?? MODERATOR).toPublicKey(),
-      async () => {
-        await mutuum.setChainVault(CHAIN_VAULT.toPublicKey());
-      },
-    );
-    await tx.sign();
-    await tx.send();
-    await appChain.produceBlock();
-  };
-
   const supplyLiquidity = async (signer: PrivateKey, amount: UInt64) => {
     appChain.setSigner(signer);
     const tx = await appChain.transaction(signer.toPublicKey(), async () => {
@@ -137,9 +124,6 @@ describe("Mutuum", () => {
     firstCall: boolean = true,
   ) => {
     await drip(signer, dripAmount);
-    if (firstCall) {
-      await setChainValut(MODERATOR);
-    }
     await supplyLiquidity(signer, supplyAmount ?? dripAmount);
   };
 
@@ -161,31 +145,13 @@ describe("Mutuum", () => {
   };
 
   describe("supply", () => {
-    it("should fail if CHAIN_VAULT is not set", async () => {
-      const ADAM_SMITH = PrivateKey.random();
-      await drip(ADAM_SMITH);
-      const adamSmithInitBalance = await getBalance(ADAM_SMITH);
-      await supplyLiquidity(
-        ADAM_SMITH,
-        adamSmithInitBalance
-          ? UInt64.from(adamSmithInitBalance)
-          : UInt64.from(0),
-      );
-      const adamSmithFinalBalance = await getBalance(ADAM_SMITH);
-
-      expect(adamSmithInitBalance?.toBigInt()).toEqual(
-        adamSmithFinalBalance?.toBigInt(),
-      );
-    });
-
     it("should transfer balance to CHAIN_VAULT and update position", async () => {
       const ADAM_SMITH = PrivateKey.random();
       await drip(ADAM_SMITH);
-      await setChainValut(MODERATOR);
       const adamSmithInitBalance =
         (await getBalance(ADAM_SMITH))?.toBigInt() ?? BigInt(0);
       const chainValutInitBalance =
-        (await getBalance(CHAIN_VAULT))?.toBigInt() ?? BigInt(0);
+        (await getBalance(CHAIN_VAULT_CONFIG))?.toBigInt() ?? BigInt(0);
       await supplyLiquidity(
         ADAM_SMITH,
         adamSmithInitBalance
@@ -195,7 +161,7 @@ describe("Mutuum", () => {
       const adamSmithFinalBalance =
         (await getBalance(ADAM_SMITH))?.toBigInt() ?? BigInt(0);
       const chainVaultFinalBalance =
-        (await getBalance(CHAIN_VAULT))?.toBigInt() ?? BigInt(0);
+        (await getBalance(CHAIN_VAULT_CONFIG))?.toBigInt() ?? BigInt(0);
       const supplyPosition = await getPosition(ADAM_SMITH);
       const depositTokenMap =
         await appChain.query.runtime.Mutuum.depositTokens.get(
@@ -210,41 +176,6 @@ describe("Mutuum", () => {
       }
       expect(adamSmithBalanceDelta * -1n).toEqual(chainVaultBalanceDelta);
       expect(chainVaultBalanceDelta).toBe(supplyPosition?.toBigInt());
-    });
-  });
-
-  describe("setChainVault", () => {
-    it("should fail if set by a non-authorized public key", async () => {
-      const ADAM_SMITH = PrivateKey.random();
-
-      const initChainVault =
-        await appChain.query.runtime.Mutuum.CHAIN_VAULT.get();
-
-      await setChainValut(ADAM_SMITH);
-
-      const newChainVault =
-        await appChain.query.runtime.Mutuum.CHAIN_VAULT.get();
-
-      if (initChainVault === undefined) {
-        expect(newChainVault).toBeUndefined();
-      } else {
-        expect(initChainVault).toEqual(newChainVault);
-      }
-    });
-
-    it("should update CHAIN_VAULT when called by moderator", async () => {
-      const initChainVault =
-        await appChain.query.runtime.Mutuum.CHAIN_VAULT.get();
-
-      await setChainValut(MODERATOR);
-
-      const newChainVault =
-        await appChain.query.runtime.Mutuum.CHAIN_VAULT.get();
-
-      expect(newChainVault).toBeDefined();
-      expect(newChainVault?.equals(CHAIN_VAULT.toPublicKey()).toBoolean()).toBe(
-        true,
-      );
     });
   });
 
@@ -422,7 +353,10 @@ describe("Mutuum", () => {
       await appChain.produceBlock();
 
       const priorBalance = await getBalance(ADAM_SMITH, tokenToBorrow);
-      const priorVaultBalance = await getBalance(CHAIN_VAULT, tokenToBorrow);
+      const priorVaultBalance = await getBalance(
+        CHAIN_VAULT_CONFIG,
+        tokenToBorrow,
+      );
       const priorDebt = await getDebt(positionKey);
       const priorDebtTokenMap = await getDebtTokenMap(ADAM_SMITH);
 
@@ -439,7 +373,10 @@ describe("Mutuum", () => {
       await appChain.produceBlock();
 
       const finalBalance = await getBalance(ADAM_SMITH, tokenToBorrow);
-      const finalVaultBalance = await getBalance(CHAIN_VAULT, tokenToBorrow);
+      const finalVaultBalance = await getBalance(
+        CHAIN_VAULT_CONFIG,
+        tokenToBorrow,
+      );
       const finalDebt = await getDebt(positionKey);
       const finalDebtTokenMap = await getDebtTokenMap(ADAM_SMITH);
 

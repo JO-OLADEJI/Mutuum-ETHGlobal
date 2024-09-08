@@ -13,6 +13,7 @@ import { inject } from "tsyringe";
 
 interface MutuumConfig {
   moderator: PublicKey;
+  CHAIN_VAULT: PublicKey;
 }
 
 export class PositionKey extends Struct({
@@ -60,7 +61,6 @@ export class DataFeed<Config = NoConfig> extends RuntimeModule<Config> {
 
 @runtimeModule()
 export class Mutuum extends RuntimeModule<MutuumConfig> {
-  @state() public CHAIN_VAULT = State.from<PublicKey>(PublicKey);
   @state() public deposits = StateMap.from<PositionKey, UInt64>(
     PositionKey,
     UInt64,
@@ -73,33 +73,16 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
     PublicKey,
     Token,
   );
-  // @state() public depositTokens = StateMap.from<PublicKey, Array<UInt64>>(
-  //   PublicKey,
-  //   Provable.Array(UInt64, 10),
-  // );
   @state() public borrowedTokens = StateMap.from<PublicKey, Token>(
     PublicKey,
     Token,
   );
-  // @state() public borrowedTokens = StateMap.from<PublicKey, Array<UInt64>>(
-  //   PublicKey,
-  //   Provable.Array(UInt64, 10),
-  // );
 
   public constructor(
     @inject("Balances") public balances: Balances,
     @inject("DataFeed") public dataFeed: DataFeed,
   ) {
     super();
-  }
-
-  @runtimeMethod()
-  public async setChainVault(address: PublicKey) {
-    assert(
-      this.transaction.sender.value.equals(this.config.moderator),
-      "Unauthorized!",
-    );
-    await this.CHAIN_VAULT.set(address);
   }
 
   // @runtimeMethod()
@@ -112,7 +95,7 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
   @runtimeMethod()
   public async supply(tokenId: TokenId, amount: UInt64) {
     const positionId = PositionKey.from(tokenId, this.transaction.sender.value);
-    const chainVaultAddr = (await this.CHAIN_VAULT.get()).value;
+    const chainVaultAddr = this.config.CHAIN_VAULT;
     assert(chainVaultAddr.isEmpty().not(), "CHAIN_VAULT not set!");
 
     const depositTokenMap = await this.depositTokens.get(
@@ -139,7 +122,7 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
   public async withdraw(tokenId: TokenId, amount: UInt64) {
     const senderAddr = this.transaction.sender.value;
     const positionId = PositionKey.from(tokenId, senderAddr);
-    const chainVaultAddr = (await this.CHAIN_VAULT.get()).value;
+    const chainVaultAddr = this.config.CHAIN_VAULT;
     const currentPosition = await this.deposits.get(positionId);
 
     assert(currentPosition.value.greaterThan(UInt64.from(0)), "Null position!");
@@ -184,7 +167,7 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
 
   @runtimeMethod()
   public async borrow(tokenId: TokenId, amount: UInt64) {
-    const chainVaultAddr = (await this.CHAIN_VAULT.get()).value;
+    const chainVaultAddr = this.config.CHAIN_VAULT;
     const senderAddr = this.transaction.sender.value;
     const positionKey = PositionKey.from(tokenId, senderAddr);
 
@@ -234,7 +217,7 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
   @runtimeMethod()
   public async repay(tokenId: TokenId, amount: UInt64) {
     // adjust borrow position
-    const chainVaultAddr = (await this.CHAIN_VAULT.get()).value;
+    const chainVaultAddr = this.config.CHAIN_VAULT;
     const senderAddr = this.transaction.sender.value;
     const positionKey = PositionKey.from(tokenId, senderAddr);
     const pendingDebt = (await this.debts.get(positionKey)).value;

@@ -23,6 +23,7 @@ import { useClientStore } from "@/lib/stores/client";
 import { TokenId } from "@proto-kit/library";
 import Withdraw from "./items/withdraw";
 import Borrow from "./items/borrow";
+import Repay from "./items/repay";
 
 const Dashboard = () => {
   const { wallet, connectWallet } = useWalletStore();
@@ -30,14 +31,18 @@ const Dashboard = () => {
   const { balances } = useBalancesStore();
   const tokenPrices = useTokenPricesUSD();
   const { totalUSD } = useDepositUSD();
+  const { totalDebtUSD } = useDebtsUSD();
   const { availableLoans } = useDebtsUSD();
-  const { deposits } = useMutuumStore();
+  const { deposits, debts } = useMutuumStore();
   const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(false);
   const tokensWithBalance = TOKENS.filter(
     (name) => balances[wallet ?? ""]?.[name] !== "0",
   );
   const stakedTokens = TOKENS.filter(
     (name) => (deposits[name] ?? BigInt(0)) > BigInt(0),
+  );
+  const borrowedTokens = TOKENS.filter(
+    (name) => debts[name] ?? BigInt(0) > BigInt(0),
   );
 
   return (
@@ -65,7 +70,7 @@ const Dashboard = () => {
               <h1 className="text-gray3 text-3xl font-black">
                 {totalUSD ? (
                   <span>
-                    {totalUSD.toLocaleString("en-US", {
+                    {(totalUSD - totalDebtUSD).toLocaleString("en-US", {
                       style: "currency",
                       currency: "USD",
                     })}
@@ -141,9 +146,33 @@ const Dashboard = () => {
                 ))}
               </Accordion>
             </div>
-            <div className="border-grayd h-12 w-6/12 rounded-sm border border-solid">
-              <h1>Debts</h1>{" "}
-              <span className="text-xs font-bold">[owing positions]</span>
+            <div className="border-grayd w-6/12 rounded-sm border border-solid">
+              <div className="p-3 pb-7">
+                <h1 className="ext-gray5 font-bold">Debts</h1>
+                <div className="border-grayd text-gray5 rounded-sm border border-solid px-2 py-1 text-xs">
+                  Debt:{" "}
+                  <span className="font-bold">
+                    {totalDebtUSD.toLocaleString("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                    })}
+                  </span>
+                </div>
+              </div>
+              <div className="text-gray3 grid grid-cols-3 px-2 text-xs font-semibold">
+                <p>Asset</p>
+                <p>Debt</p>
+              </div>
+              <Accordion type="single" collapsible>
+                {borrowedTokens.map((name, index) => (
+                  <Repay
+                    key={index}
+                    tokenName={name}
+                    debt={debts[name]}
+                    tokenPrice={tokenPrices[name]}
+                  />
+                ))}
+              </Accordion>
             </div>
           </div>
           <div className="mx-auto flex w-10/12 items-start justify-between gap-x-2.5">
@@ -209,7 +238,7 @@ const Dashboard = () => {
           </div>
         </>
       )}
-      <div className="footer " />
+      <div className="footer h-24" />
     </Sheet>
   );
 };

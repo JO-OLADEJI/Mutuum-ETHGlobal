@@ -12,7 +12,6 @@ import { Balances } from "./balances";
 import { inject } from "tsyringe";
 
 interface MutuumConfig {
-  moderator: PublicKey;
   CHAIN_VAULT: PublicKey;
 }
 

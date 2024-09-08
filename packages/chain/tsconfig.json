@@ -16,7 +16,8 @@
     "strict": true,
     "alwaysStrict": true,
     "declarationMap": true,
-    "strictFunctionTypes": true
+    "strictFunctionTypes": true,
+    "resolveJsonModule": true
   },
   "files": ["node_modules/jest-expect-message/types/index.d.ts"],
   "include": ["./src/**/*"],

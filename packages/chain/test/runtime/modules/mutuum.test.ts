@@ -32,7 +32,6 @@ describe("Mutuum", () => {
       Runtime: {
         DataFeed: {},
         Mutuum: {
-          moderator: MODERATOR.toPublicKey(),
           CHAIN_VAULT: CHAIN_VAULT_CONFIG,
         },
         Balances: {

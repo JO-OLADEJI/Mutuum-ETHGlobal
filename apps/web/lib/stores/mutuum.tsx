@@ -17,6 +17,7 @@ export interface MutuumState {
   deposits: Partial<{ [key in AppChainTokens]: bigint }>;
   loadDeposits: (client: Client) => Promise<void>;
   supply: (client: Client, tokenId: TokenId, amount: UInt64) => Promise<void>;
+  withdraw: (client: Client, tokenId: TokenId, amount: UInt64) => Promise<void>;
 }
 
 export const useMutuumStore = create<MutuumState, [["zustand/immer", never]]>(
@@ -33,6 +34,21 @@ export const useMutuumStore = create<MutuumState, [["zustand/immer", never]]>(
         PublicKey.fromBase58(connectedWallet),
         async () => {
           await mutuum.supply(tokenId, amount);
+        },
+      );
+      await tx.sign();
+      await tx.send();
+    },
+
+    async withdraw(client: Client, tokenId: TokenId, amount: UInt64) {
+      const connectedWallet = useWalletStore.getState().wallet;
+      if (!connectedWallet) return;
+      const mutuum = client.runtime.resolve("Mutuum");
+
+      const tx = await client.transaction(
+        PublicKey.fromBase58(connectedWallet),
+        async () => {
+          await mutuum.withdraw(tokenId, amount);
         },
       );
       await tx.sign();
@@ -74,18 +90,19 @@ export const useDepositUSD = () => {
   const { client } = useClientStore();
   const tokenPrices = useTokenPricesUSD();
   const { deposits, loadDeposits } = useMutuumStore();
-  const [depositsUSD, setDepositsUSD] = useState<
-    Partial<{ [key in AppChainTokens]: bigint }>
-  >({});
 
-  const totalUSD = useMemo(() => {
+  const { totalUSD, depositsUSD } = useMemo(() => {
     let total = 0;
+    const map: Partial<{ [key in AppChainTokens]: number }> = {};
+
     TOKENS.forEach((value) => {
       total += Number(deposits[value] ?? 0) * Number(tokenPrices[value] ?? 0);
+      map[value] =
+        Number(deposits[value] ?? 0) * Number(tokenPrices[value] ?? 0);
     });
-    console.log(total);
-    return total;
-  }, [deposits]);
+
+    return { totalUSD: total, depositsUSD: map };
+  }, [deposits, tokenPrices]);
 
   useEffect(() => {
     if (!client) return;

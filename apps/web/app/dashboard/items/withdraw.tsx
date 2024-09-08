@@ -13,31 +13,31 @@ import { getTokenId } from "@/lib/utils";
 import { UInt64 } from "@proto-kit/library";
 import { useState } from "react";
 
-interface SupplyProps {
+interface WithdrawProps {
   tokenName: AppChainTokens;
-  balance: string | undefined;
+  stake: bigint | undefined;
   tokenPrice: string | undefined;
 }
 
-const Supply = ({ tokenName, balance, tokenPrice }: SupplyProps) => {
+const Withdraw = ({ tokenName, stake, tokenPrice }: WithdrawProps) => {
   const { client } = useClientStore();
-  const { supply: stake } = useMutuumStore();
+  const { withdraw: unstake } = useMutuumStore();
   const [amount, setAmount] = useState<string>("");
 
   return (
     <AccordionItem value={tokenName} className="border-b-0 p-0">
-      <div className="border-graye grid grid-cols-4 border-t border-solid p-2">
+      <div className="border-graye grid grid-cols-3 border-t border-solid p-2">
         <div className="flex items-center">
           <p className="text-xs">{tokenName}</p>
         </div>
         <div className="flex items-center">
           <div className="text-sm">
-            <p>{balance ?? "0"}</p>
+            <p>{Number(stake ?? 0)}</p>
             <p className="text-[9px] font-extrabold">
-              {!balance
+              {!stake
                 ? "0"
                 : tokenPrice
-                  ? (Number(balance) * Number(tokenPrice)).toLocaleString(
+                  ? (Number(stake) * Number(tokenPrice)).toLocaleString(
                       "en-US",
                       {
                         style: "currency",
@@ -48,12 +48,9 @@ const Supply = ({ tokenName, balance, tokenPrice }: SupplyProps) => {
             </p>
           </div>
         </div>
-        <div className="flex items-center">
-          <Switch checked={true} className="scale-75 cursor-not-allowed" />
-        </div>
         <div className="flex items-center justify-center">
           <AccordionTrigger className="border-grayd text-gray5 rounded-sm border border-solid px-4 py-1 text-xs hover:no-underline">
-            Supply
+            Withdraw
           </AccordionTrigger>
         </div>
       </div>
@@ -71,11 +68,15 @@ const Supply = ({ tokenName, balance, tokenPrice }: SupplyProps) => {
             className="w-[49%]"
             disabled={amount === "0" || amount === ""}
             onClick={async () => {
-              await stake(client!!, getTokenId(tokenName), UInt64.from(amount));
+              await unstake(
+                client!!,
+                getTokenId(tokenName),
+                UInt64.from(amount),
+              );
               setAmount("");
             }}
           >
-            Stake {amount && amount !== "0" && `${amount} ${tokenName}`}
+            Withdraw {amount && amount !== "0" && `${amount} ${tokenName}`}
           </Button>
         </div>
       </AccordionContent>
@@ -83,4 +84,4 @@ const Supply = ({ tokenName, balance, tokenPrice }: SupplyProps) => {
   );
 };
 
-export default Supply;
+export default Withdraw;

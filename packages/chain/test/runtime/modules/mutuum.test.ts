@@ -4,6 +4,7 @@ import {
   Mutuum,
   PositionKey,
   DataFeed,
+  USDRates,
 } from "../../../src/runtime/modules/mutuum";
 import { PrivateKey, PublicKey } from "o1js";
 import { Balances } from "../../../src/runtime/modules/balances";
@@ -129,18 +130,19 @@ describe("Mutuum", () => {
   const setDataFeedRates = async () => {
     appChain.setSigner(MODERATOR);
     const usdPrices = mockFetchUSDPrices();
+    const data: USDRates = USDRates.empty();
 
     for (let i = 0; i < usdPrices.length; i++) {
-      const tx = await appChain.transaction(
-        MODERATOR.toPublicKey(),
-        async () => {
-          await mutuum.dataFeed.setUSDRates(TokenId.from(i), usdPrices[i]);
-        },
-      );
-      await tx.sign();
-      await tx.send();
-      await appChain.produceBlock();
+      data.tokenIds[i] = TokenId.from(i);
+      data.rates[i] = usdPrices[i];
     }
+
+    const tx = await appChain.transaction(MODERATOR.toPublicKey(), async () => {
+      await mutuum.dataFeed.setUSDRates(data);
+    });
+    await tx.sign();
+    await tx.send();
+    await appChain.produceBlock();
   };
 
   describe("supply", () => {

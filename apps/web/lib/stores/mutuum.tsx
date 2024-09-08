@@ -189,7 +189,7 @@ export const useDebtsUSD = () => {
       map[value] = Number(debts[value] ?? 0) * Number(tokenPrices[value] ?? 0);
     });
 
-    // console.log({ totalDebtUSD: total });
+    console.log({ totalDebtUSD: total });
     return { totalDebtUSD: total, debtsUSD: map };
   }, [debts, tokenPrices]);
 

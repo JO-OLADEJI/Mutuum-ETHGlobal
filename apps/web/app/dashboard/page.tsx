@@ -30,6 +30,7 @@ import { useClientStore } from "@/lib/stores/client";
 import { TokenId } from "@proto-kit/library";
 import Withdraw from "./items/withdraw";
 import Borrow from "./items/borrow";
+import { useDatafeed } from "@/lib/stores/datafeed";
 
 const Dashboard = () => {
   const { wallet, connectWallet } = useWalletStore();
@@ -39,6 +40,7 @@ const Dashboard = () => {
   const { totalUSD } = useDepositUSD();
   const { availableLoans } = useDebtsUSD();
   const { deposits } = useMutuumStore();
+  const refreshDatafeed = useDatafeed();
   const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(false);
   const tokensWithBalance = TOKENS.filter(
     (name) => balances[wallet ?? ""]?.[name] !== "0",
@@ -63,7 +65,6 @@ const Dashboard = () => {
           </SheetTrigger>
         )}
       </nav>
-
       <div className="mx-auto my-12 flex w-10/12 items-center justify-between">
         <div>
           <h1 className="text-gray3 text-5xl font-black">Portfolio</h1>
@@ -93,6 +94,8 @@ const Dashboard = () => {
         </div>
         <Image src={hodl} alt="crypto portfolio" width={200} height={200} />
       </div>
+
+      <Button onClick={async () => refreshDatafeed()}>Refresh DataFeed</Button>
 
       {!wallet ? (
         <div className="border-graye m-auto w-10/12 rounded-sm border border-solid pb-16 pt-12 text-center">
@@ -217,7 +220,6 @@ const Dashboard = () => {
           </div>
         </>
       )}
-
       <div className="footer " />
     </Sheet>
   );

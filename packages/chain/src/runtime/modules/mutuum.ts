@@ -42,14 +42,31 @@ class Token extends Struct({
   }
 }
 
+export class USDRates extends Struct({
+  tokenIds: Provable.Array(TokenId, 6),
+  rates: Provable.Array(UInt64, 6),
+}) {
+  public static empty(): USDRates {
+    const tokenIds = Array<TokenId>(6).fill(TokenId.from(0));
+    const rates = Array<UInt64>(6).fill(UInt64.from(0));
+    return new USDRates({ tokenIds, rates });
+  }
+}
+
 @runtimeModule()
 export class DataFeed<Config = NoConfig> extends RuntimeModule<Config> {
   // tokenId => USD Rate (8 decimals precision)
   @state() public tokenRates = StateMap.from<TokenId, UInt64>(TokenId, UInt64);
 
   @runtimeMethod()
-  public async setUSDRates(tokenId: TokenId, usdRate: UInt64) {
-    await this.tokenRates.set(tokenId, usdRate);
+  public async setUSDRates(data: USDRates) {
+    assert(
+      Bool.fromJSON(data.tokenIds.length === data.rates.length),
+      "Data mismatch!",
+    );
+    for (let i = 0; i < data.tokenIds.length; i++) {
+      await this.tokenRates.set(data.tokenIds[i], data.rates[i]);
+    }
   }
 
   @runtimeMethod()
@@ -264,7 +281,7 @@ export class Mutuum extends RuntimeModule<MutuumConfig> {
   }
 
   @runtimeMethod()
-  public async getDepositUSD() {
+  private async getDepositUSD() {
     let depositValueUSD = UInt64.from(0);
     const depositTokenMap = await this.depositTokens.get(
       this.transaction.sender.value,

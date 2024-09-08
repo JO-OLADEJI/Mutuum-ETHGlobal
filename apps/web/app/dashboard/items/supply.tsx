@@ -6,15 +6,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { useClientStore } from "@/lib/stores/client";
+import { useMutuumStore } from "@/lib/stores/mutuum";
 import { AppChainTokens } from "@/lib/types";
+import { TokenId, UInt64 } from "@proto-kit/library";
+import { useState } from "react";
 
 interface SupplyProps {
   tokenName: AppChainTokens;
+  tokenId: TokenId;
   balance: string | undefined;
   tokenPrice: string | undefined;
 }
 
-const Supply = ({ tokenName, balance, tokenPrice }: SupplyProps) => {
+const Supply = ({ tokenName, tokenId, balance, tokenPrice }: SupplyProps) => {
+  const { client } = useClientStore();
+  const { supply: stake } = useMutuumStore();
+  const [amount, setAmount] = useState<string>("");
+
   return (
     <AccordionItem value={tokenName} className="border-b-0 p-0">
       <div className="border-graye grid grid-cols-4 border-t border-solid p-2">
@@ -50,8 +59,24 @@ const Supply = ({ tokenName, balance, tokenPrice }: SupplyProps) => {
       </div>
       <AccordionContent className="p-2">
         <div className="flex items-center justify-between">
-          <Input className="w-[49%]" placeholder="supply tokens here" />
-          <Button className="w-[49%]">Execute</Button>
+          <Input
+            type="number"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="w-[49%] hover:border-black"
+            placeholder="amount"
+          />
+          <Button
+            className="w-[49%]"
+            disabled={amount === "0" || amount === ""}
+            onClick={async () => {
+              await stake(client!!, tokenId, UInt64.from(amount));
+              setAmount("");
+            }}
+          >
+            Stake {amount && amount !== "0" && `${amount} ${tokenName}`}
+          </Button>
         </div>
       </AccordionContent>
     </AccordionItem>

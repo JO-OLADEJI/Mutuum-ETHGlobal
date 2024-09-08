@@ -7,15 +7,15 @@ import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { useState } from "react";
 import { PublicKey } from "o1js";
-import { UInt64 } from "@proto-kit/library";
+import { UInt64, TokenId } from "@proto-kit/library";
 
 export interface FaucetProps {
   wallet?: string;
   loading: boolean;
   trfLoading: boolean;
   onConnectWallet: () => void;
-  onDrip: () => void;
-  onTransfer: (to: PublicKey, amount: UInt64) => void;
+  onDrip: (tokenId: TokenId) => void;
+  onTransfer: (to: PublicKey, amount: UInt64, tokenId: TokenId) => void;
 }
 
 export function Faucet({
@@ -66,7 +66,7 @@ export function Faucet({
           loading={loading}
           onClick={() => {
             wallet ?? onConnectWallet();
-            wallet && onDrip();
+            wallet && onDrip(TokenId.from(0));
           }}
         >
           {wallet ? "Drip 💦" : "Connect wallet"}
@@ -98,7 +98,11 @@ export function Faucet({
           loading={trfLoading}
           onClick={() => {
             if (!destAddr || !trfAmount) return;
-            onTransfer(PublicKey.fromBase58(destAddr), UInt64.from(trfAmount));
+            onTransfer(
+              PublicKey.fromBase58(destAddr),
+              UInt64.from(trfAmount),
+              TokenId.from(0),
+            );
           }}
         >
           Send

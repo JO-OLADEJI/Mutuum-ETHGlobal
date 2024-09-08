@@ -21,6 +21,9 @@ import coin from "@/public/coin.png";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion } from "@/components/ui/accordion";
 import Supply from "./items/supply";
+import { useMutuumStore } from "@/lib/stores/mutuum";
+import { useClientStore } from "@/lib/stores/client";
+import { TokenId } from "@proto-kit/library";
 
 const Dashboard = () => {
   const { wallet, connectWallet } = useWalletStore();
@@ -28,6 +31,7 @@ const Dashboard = () => {
   const [healthFactor, setHealthFactor] = useState<number>(0);
   const { balances } = useBalancesStore();
   const tokenPrices = useTokenPricesUSD();
+  const { client } = useClientStore();
   const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(false);
   const tokensWithBalance = TOKENS.filter(
     (name) => balances[wallet ?? ""]?.[name] !== "0",
@@ -129,6 +133,7 @@ const Dashboard = () => {
                 (name, index) => (
                   <Supply
                     key={index}
+                    tokenId={TokenId.from(index)}
                     tokenName={name}
                     balance={balances[wallet]?.[name]}
                     tokenPrice={tokenPrices[name]}
@@ -136,42 +141,6 @@ const Dashboard = () => {
                 ),
               )}
             </Accordion>
-            {/*(hideZeroBalance ? tokensWithBalance : TOKENS).map(
-              (name, index) => (
-                <div
-                  key={index}
-                  className="border-graye grid grid-cols-4 border-t border-solid p-2"
-                >
-                  <div className="flex items-center">
-                    <p className="text-xs">{name}</p>
-                  </div>
-                  <div className="text-sm">
-                    <p>{balances[wallet]?.[name] ?? "0"}</p>
-                    <p className="text-[9px] font-extrabold">
-                      {!balances[wallet]?.[name]
-                        ? "0"
-                        : tokenPrices[name]
-                          ? (
-                              Number(balances[wallet][name]) *
-                              Number(tokenPrices[name])
-                            ).toLocaleString("en-US", {
-                              style: "currency",
-                              currency: "USD",
-                            })
-                          : "-"}
-                    </p>
-                  </div>
-                  <div className="flex items-center">
-                    <p className="text-xs">Toggle</p>
-                  </div>
-                  <div className="text-center">
-                    <Button size={"sm"} variant={"outline"} className="w-fit">
-                      Supply
-                    </Button>
-                  </div>
-                </div>
-              ),
-            )*/}
           </div>
           <div className="border-graye h-96 w-6/12 rounded-sm border border-solid">
             <h1>Borrow</h1>

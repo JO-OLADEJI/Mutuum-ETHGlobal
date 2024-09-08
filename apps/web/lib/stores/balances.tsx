@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { Client, useClientStore } from "./client";
 import { immer } from "zustand/middleware/immer";
 import { PendingTransaction, UnsignedTransaction } from "@proto-kit/sequencer";
-import { Balance, BalancesKey, UInt64 } from "@proto-kit/library";
+import { Balance, BalancesKey, UInt64, TokenId } from "@proto-kit/library";
 import { PublicKey } from "o1js";
 import { useCallback, useEffect, useState } from "react";
 import { useChainStore } from "./chain";
@@ -19,12 +19,17 @@ export interface BalancesState {
     [key: string]: { [key in AppChainTokens]: string };
   };
   loadBalances: (client: Client, address: string) => Promise<void>;
-  faucet: (client: Client, address: string) => Promise<PendingTransaction>;
+  faucet: (
+    client: Client,
+    address: string,
+    tokenId: TokenId,
+  ) => Promise<PendingTransaction>;
   transfer: (
     client: Client,
     fromAddress: PublicKey,
     toAddress: PublicKey,
     amount: UInt64,
+    tokenId: TokenId,
   ) => Promise<PendingTransaction>;
 }
 
@@ -66,16 +71,12 @@ export const useBalancesStore = create<
         );
       });
     },
-    async faucet(client: Client, address: string) {
+    async faucet(client: Client, address: string, tokenId: TokenId) {
       const balances = client.runtime.resolve("Balances");
       const sender = PublicKey.fromBase58(address);
 
       const tx = await client.transaction(sender, async () => {
-        await balances.addBalance(
-          useAppStore.getState().activeTokenId,
-          sender,
-          Balance.from(1000),
-        );
+        await balances.addBalance(tokenId, sender, Balance.from(10000));
       });
 
       await tx.sign();
@@ -89,12 +90,13 @@ export const useBalancesStore = create<
       fromAddress: PublicKey,
       toAddress: PublicKey,
       amount: UInt64,
+      tokenId: TokenId,
     ) {
       const balances = client.runtime.resolve("Balances");
 
       const tx = await client.transaction(fromAddress, async () => {
         await balances.transferSigned(
-          useAppStore.getState().activeTokenId,
+          tokenId,
           fromAddress,
           toAddress,
           Balance.from(amount),
@@ -128,16 +130,20 @@ export const useFaucet = () => {
   const balances = useBalancesStore();
   const wallet = useWalletStore();
 
-  return useCallback(async () => {
-    if (!client.client || !wallet.wallet) return;
+  return useCallback(
+    async (tokenId: TokenId) => {
+      if (!client.client || !wallet.wallet) return;
 
-    const pendingTransaction = await balances.faucet(
-      client.client,
-      wallet.wallet,
-    );
+      const pendingTransaction = await balances.faucet(
+        client.client,
+        wallet.wallet,
+        tokenId,
+      );
 
-    wallet.addPendingTransaction(pendingTransaction);
-  }, [client.client, wallet.wallet]);
+      wallet.addPendingTransaction(pendingTransaction);
+    },
+    [client.client, wallet.wallet],
+  );
 };
 
 export const useTransfer = () => {
@@ -147,7 +153,7 @@ export const useTransfer = () => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const action = useCallback(
-    async (to: PublicKey, amount: UInt64) => {
+    async (to: PublicKey, amount: UInt64, tokenId: TokenId) => {
       if (!client.client || !wallet.wallet) return;
 
       setLoading(true);
@@ -156,6 +162,7 @@ export const useTransfer = () => {
         PublicKey.fromBase58(wallet.wallet),
         to,
         amount,
+        tokenId,
       );
 
       wallet.addPendingTransaction(pendingTransaction);

@@ -8,16 +8,9 @@ import SidePanel from "./side-panel";
 import { useEffect, useState } from "react";
 import { useBalancesStore } from "@/lib/stores/balances";
 import useTokenPricesUSD from "@/lib/stores/rates";
-import { Separator } from "@/components/ui/separator";
 import { TOKENS } from "@/lib/constants";
-import { Card } from "@/components/ui/card";
-import { Avatar } from "@radix-ui/react-avatar";
-import { AvatarFallback } from "@/components/ui/avatar";
-
-// assets
 import dogecoin from "@/public/dogecoin.png";
 import hodl from "@/public/hodl.png";
-import coin from "@/public/coin.png";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion } from "@/components/ui/accordion";
 import Supply from "./items/supply";
@@ -30,7 +23,6 @@ import { useClientStore } from "@/lib/stores/client";
 import { TokenId } from "@proto-kit/library";
 import Withdraw from "./items/withdraw";
 import Borrow from "./items/borrow";
-import { useDatafeed } from "@/lib/stores/datafeed";
 
 const Dashboard = () => {
   const { wallet, connectWallet } = useWalletStore();
@@ -40,7 +32,6 @@ const Dashboard = () => {
   const { totalUSD } = useDepositUSD();
   const { availableLoans } = useDebtsUSD();
   const { deposits } = useMutuumStore();
-  const refreshDatafeed = useDatafeed();
   const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(false);
   const tokensWithBalance = TOKENS.filter(
     (name) => balances[wallet ?? ""]?.[name] !== "0",
@@ -94,8 +85,6 @@ const Dashboard = () => {
         </div>
         <Image src={hodl} alt="crypto portfolio" width={200} height={200} />
       </div>
-
-      <Button onClick={async () => refreshDatafeed()}>Refresh DataFeed</Button>
 
       {!wallet ? (
         <div className="border-graye m-auto w-10/12 rounded-sm border border-solid pb-16 pt-12 text-center">

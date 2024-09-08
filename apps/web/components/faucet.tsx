@@ -8,6 +8,7 @@ import { Separator } from "./ui/separator";
 import { useState } from "react";
 import { PublicKey } from "o1js";
 import { UInt64, TokenId } from "@proto-kit/library";
+import { useAppStore } from "@/lib/stores/app";
 
 export interface FaucetProps {
   wallet?: string;

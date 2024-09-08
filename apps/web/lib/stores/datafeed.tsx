@@ -21,7 +21,9 @@ export const useDatafeed = () => {
 
     for (let i = 0; i < TOKENS.length; i++) {
       data.tokenIds[i] = getTokenId(TOKENS[i]);
-      data.rates[i] = UInt64.from(Number(tokenPrices[TOKENS[i]]) * 10 ** 8);
+      data.rates[i] = UInt64.from(
+        Math.round(Number(tokenPrices[TOKENS[i]]) * 10 ** 8),
+      );
     }
 
     const tx = await client.transaction(

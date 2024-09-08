@@ -1,5 +1,4 @@
 import { UInt64 } from "@proto-kit/library";
-import { TokenId } from "o1js/dist/node/bindings/mina-transaction/transaction-leaves-bigint";
 
 export const mockFetchUSDPrices = () => {
   return [

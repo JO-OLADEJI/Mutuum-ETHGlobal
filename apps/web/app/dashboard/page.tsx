@@ -21,10 +21,15 @@ import coin from "@/public/coin.png";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion } from "@/components/ui/accordion";
 import Supply from "./items/supply";
-import { useDepositUSD, useMutuumStore } from "@/lib/stores/mutuum";
+import {
+  useDebtsUSD,
+  useDepositUSD,
+  useMutuumStore,
+} from "@/lib/stores/mutuum";
 import { useClientStore } from "@/lib/stores/client";
 import { TokenId } from "@proto-kit/library";
 import Withdraw from "./items/withdraw";
+import Borrow from "./items/borrow";
 
 const Dashboard = () => {
   const { wallet, connectWallet } = useWalletStore();
@@ -32,8 +37,8 @@ const Dashboard = () => {
   const { balances } = useBalancesStore();
   const tokenPrices = useTokenPricesUSD();
   const { totalUSD } = useDepositUSD();
+  const { availableLoans } = useDebtsUSD();
   const { deposits } = useMutuumStore();
-  // const { client } = useClientStore();
   const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(false);
   const tokensWithBalance = TOKENS.filter(
     (name) => balances[wallet ?? ""]?.[name] !== "0",
@@ -112,8 +117,8 @@ const Dashboard = () => {
         </div>
       ) : (
         <>
-          <div className="mx-auto flex w-10/12 items-start justify-between gap-x-2.5">
-            <div className="border-graye w-6/12 rounded border border-solid">
+          <div className="mx-auto mb-8 flex w-10/12 items-start justify-between gap-x-2.5">
+            <div className="border-grayd w-6/12 rounded border border-solid">
               <div className="p-3 pb-7">
                 <h1 className="text-gray5 font-bold">
                   Stake -{" "}
@@ -129,7 +134,7 @@ const Dashboard = () => {
                   </span>
                 </div>
               </div>
-              <div className="text-gray7 grid grid-cols-3 px-2 text-xs font-semibold">
+              <div className="text-gray3 grid grid-cols-3 px-2 text-xs font-semibold">
                 <p>Asset</p>
                 <p>Stake</p>
               </div>
@@ -144,12 +149,13 @@ const Dashboard = () => {
                 ))}
               </Accordion>
             </div>
-            <div className="border-graye h-96 w-6/12 rounded-sm border border-solid">
-              <h1>Lend</h1>
+            <div className="border-grayd h-12 w-6/12 rounded-sm border border-solid">
+              <h1>Debts</h1>{" "}
+              <span className="text-xs font-bold">[owing positions]</span>
             </div>
           </div>
           <div className="mx-auto flex w-10/12 items-start justify-between gap-x-2.5">
-            <div className="border-graye w-6/12 rounded border border-solid">
+            <div className="border-grayd w-6/12 rounded border border-solid">
               <div className="p-3 pb-7">
                 <h1 className="text-gray5 font-bold">
                   Assets -{" "}
@@ -167,7 +173,7 @@ const Dashboard = () => {
                   </label>
                 </div>
               </div>
-              <div className="text-gray7 grid grid-cols-4 px-2 text-xs font-semibold">
+              <div className="text-gray3 grid grid-cols-4 px-2 text-xs font-semibold">
                 <p>Asset</p>
                 <p>Wallet Balance</p>
                 <p>Collateralize</p>
@@ -185,12 +191,34 @@ const Dashboard = () => {
                 )}
               </Accordion>
             </div>
-            <div className="border-graye h-96 w-6/12 rounded-sm border border-solid">
-              <h1>Borrow</h1>
+            <div className="border-grayd w-6/12 rounded-sm border border-solid">
+              <div className="p-3 pb-7">
+                <h1 className="text-gray5 font-bold">Eligible Loans</h1>
+                <p className="text-gray7 text-xs">
+                  keep an eye on your health factor
+                </p>
+              </div>
+              <div className="text-gray3 grid grid-cols-4 px-2 text-xs font-semibold">
+                <p>Asset</p>
+                <p>Available</p>
+                <p>APY</p>
+              </div>
+              <Accordion type="single" collapsible>
+                {TOKENS.map((name, index) => (
+                  <Borrow
+                    key={index}
+                    tokenName={name}
+                    eligibleLoan={availableLoans[name]}
+                    tokenPrice={tokenPrices[name]}
+                  />
+                ))}
+              </Accordion>
             </div>
           </div>
         </>
       )}
+
+      <div className="footer " />
     </Sheet>
   );
 };
